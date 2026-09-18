@@ -26,6 +26,26 @@ public class OrderEntity {
     @Column(name = "total_amount", nullable = false, precision = 19, scale = 2)
     private BigDecimal totalAmount;
 
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public void setCustomerId(UUID customerId) {
+        this.customerId = customerId;
+    }
+
+    public void setStatus(OrderStatus status) {
+        this.status = status;
+    }
+
+    public void setTotalAmount(BigDecimal totalAmount) {
+        this.totalAmount = totalAmount;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
+
     @Column(nullable = false, length = 3)
     private String currency;
 
@@ -41,15 +61,16 @@ public class OrderEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    protected OrderEntity() {
-    }
-
     public OrderEntity(UUID customerId, BigDecimal totalAmount, String currency) {
         this.id = UUID.randomUUID();
         this.customerId = customerId;
         this.status = OrderStatus.PENDING;
         this.totalAmount = totalAmount;
         this.currency = currency;
+    }
+
+    public OrderEntity() {
+
     }
 
     public UUID getId() {
@@ -82,5 +103,17 @@ public class OrderEntity {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    @PrePersist
+    public void prePersist() {
+        Instant now = Instant.now();
+        this.createdAt = now;
+        this.updatedAt = now;
+    }
+
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = Instant.now();
     }
 }

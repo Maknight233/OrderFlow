@@ -9,6 +9,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/orders")
 public class OrderController {
@@ -23,10 +25,19 @@ public class OrderController {
     public ResponseEntity<OrderResponse> createOrder(
             @Valid @RequestBody CreateOrderRequest request) {
 
-        OrderEntity order = orderApplicationService.createOrder(request);
+        OrderResponse order = orderApplicationService.createOrder(request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(OrderResponse.from(order));
+                .body(order);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<OrderResponse> getOrderById(
+            @PathVariable UUID id) {
+
+        return ResponseEntity.ok(
+                orderApplicationService.getOrderById(id)
+        );
     }
 }
