@@ -26,6 +26,7 @@
         <module>gateway-service</module>
         <module>discovery-service</module>
         <module>order-service</module>
+        <module>inventory-service</module>
     </modules>
 
 </project>

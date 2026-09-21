@@ -1,0 +1,14 @@
+package com.rom.orderflow.inventory.repository;
+
+import com.rom.orderflow.inventory.domain.Inventory;
+import jakarta.validation.constraints.NotBlank;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface InventoryRepository extends JpaRepository<Inventory, Long> {
+
+    Optional<Inventory> findBySku(String sku);
+
+    boolean existsBySku(@NotBlank String sku);
+}
