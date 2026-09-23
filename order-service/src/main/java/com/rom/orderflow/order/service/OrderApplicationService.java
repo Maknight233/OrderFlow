@@ -4,13 +4,15 @@ import com.rom.orderflow.order.dto.CreateOrderRequest;
 import com.rom.orderflow.order.domain.OrderEntity;
 import com.rom.orderflow.order.dto.OrderResponse;
 import com.rom.orderflow.order.error.OrderNotFoundException;
-import com.rom.orderflow.order.event.OrderCreatedEvent;
-import com.rom.orderflow.order.event.OrderEventPublisher;
+import com.rom.orderflow.order.kafka.event.OrderCreatedEvent;
+import com.rom.orderflow.order.kafka.publisher.OrderEventPublisher;
+import com.rom.orderflow.order.kafka.event.OrderItemEvent;
 import com.rom.orderflow.order.repository.OrderRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -38,13 +40,22 @@ public class OrderApplicationService {
 
         OrderEntity saved = orderRepository.save(order);
 
+        List<OrderItemEvent> items = request.items()
+                .stream()
+                .map(item -> new OrderItemEvent(
+                        item.sku(),
+                        item.quantity()
+                ))
+                .toList();
+
         OrderCreatedEvent event = new OrderCreatedEvent(
                 UUID.randomUUID(),
-                saved.getId(),
-                saved.getCustomerId(),
-                saved.getStatus().name(),
-                saved.getTotalAmount(),
-                saved.getCurrency(),
+                order.getId(),
+                order.getCustomerId(),
+                order.getStatus().name(),
+                order.getTotalAmount(),
+                order.getCurrency(),
+                items,
                 Instant.now()
         );
 

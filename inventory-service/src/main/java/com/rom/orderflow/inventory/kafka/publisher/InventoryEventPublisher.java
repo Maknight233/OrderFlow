@@ -1,24 +1,24 @@
-package com.rom.orderflow.order.event;
+package com.rom.orderflow.inventory.kafka.publisher;
 
+import com.rom.orderflow.inventory.kafka.event.InventoryResultEvent;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
-public class OrderEventPublisher {
+public class InventoryEventPublisher {
 
-    private static final String ORDER_EVENTS_TOPIC = "order-events";
+    private static final String INVENTORY_EVENTS_TOPIC = "inventory-events";
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    public OrderEventPublisher(
+    public InventoryEventPublisher(
             KafkaTemplate<String, Object> kafkaTemplate) {
         this.kafkaTemplate = kafkaTemplate;
     }
 
-    public void publishOrderCreated(OrderCreatedEvent event) {
-
+    public void publish(InventoryResultEvent event) {
         kafkaTemplate.send(
-                ORDER_EVENTS_TOPIC,
+                INVENTORY_EVENTS_TOPIC,
                 event.orderId().toString(),
                 event
         );

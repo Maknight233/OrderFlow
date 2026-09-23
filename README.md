@@ -1,914 +1,535 @@
 # OrderFlow
 
-OrderFlow is a distributed order processing platform built with Java 21, Spring Boot, Spring Cloud, PostgreSQL, Kafka, Redis, Flyway, and Docker.
+OrderFlow is a distributed order processing platform built with Java 21, Spring Boot, Spring Cloud, PostgreSQL, Kafka, Redis, and Docker.
 
-The project is designed to demonstrate production-oriented microservice patterns such as service discovery, API gateway routing, database-per-service, event-driven communication, database migrations, optimistic locking, inventory reservation, concurrency control, and distributed workflow patterns.
+The project is designed to demonstrate production-oriented microservice patterns such as service discovery, API gateway routing, event-driven communication, database migrations, optimistic locking, idempotent inventory reservation, and asynchronous order workflows.
 
----
+## Current Status
 
-## Current Architecture
-
-```text
-                              ┌─────────────────────┐
-                              │   Discovery Service │
-                              │     Eureka :8761    │
-                              └──────────┬──────────┘
-                                         │
-                              Service Registration
-                                         │
-                 ┌───────────────────────┼───────────────────────┐
-                 │                       │                       │
-        ┌────────▼────────┐     ┌────────▼────────┐     ┌────────▼─────────┐
-        │ Gateway Service │     │  Order Service  │     │ Inventory Service│
-        │      :9000      │     │      :8081      │     │      :8082       │
-        └────────┬────────┘     └────────┬────────┘     └────────┬─────────┘
-                 │                       │                       │
-                 │                       │                       │
-                 │                ┌──────▼──────┐         ┌──────▼──────┐
-                 │                │ PostgreSQL  │         │ PostgreSQL  │
-                 │                │  orderflow  │         │inventory_db │
-                 │                └─────────────┘         └─────────────┘
-                 │
-                 │
-                 └──── Client traffic enters through Gateway
-
-                           ┌────────────────────┐
-                           │       Kafka        │
-                           │      :9092         │
-                           └────────────────────┘
-
-                           ┌────────────────────┐
-                           │       Redis        │
-                           │      :6379         │
-                           └────────────────────┘
-```
-
----
-
-## Services
-
-### Discovery Service
-
-Provides service discovery using Netflix Eureka.
-
-```text
-Port: 8761
-```
-
-Responsibilities:
-
-- Service registration
-- Service discovery
-- Dynamic service lookup
-
-Eureka dashboard:
-
-```text
-http://localhost:8761
-```
-
----
-
-### Gateway Service
-
-Acts as the single entry point for external API requests.
-
-```text
-Port: 9000
-```
-
-Current routes:
-
-```text
-/api/orders/**
-    → order-service
-
-/api/inventory/**
-    → inventory-service
-```
-
-Services are resolved through Eureka using Spring Cloud LoadBalancer instead of hard-coded service URLs.
-
-Example:
+OrderFlow currently supports an end-to-end Kafka-driven order and inventory workflow:
 
 ```text
 Client
-  ↓
-localhost:9000/api/inventory/...
-  ↓
-Gateway
-  ↓
-Eureka
-  ↓
-inventory-service
+  |
+  v
+API Gateway :9000
+  |
+  v
+Order Service :8081
+  |
+  | save order as PENDING
+  |
+  +---- OrderCreatedEvent ----------------------+
+  |                                             |
+  |                                   Kafka: order-events
+  |                                             |
+  |                                             v
+  |                                  Inventory Service :8082
+  |                                             |
+  |                                     reserve inventory
+  |                                             |
+  |                         +-------------------+-------------------+
+  |                         |                                       |
+  |                         v                                       v
+  |                  RESERVED                                  REJECTED
+  |                         |                                       |
+  |                         +----------- InventoryResultEvent ------+
+  |                                             |
+  |                                  Kafka: inventory-events
+  |                                             |
+  +---------------------------------------------+
+                                                |
+                                                v
+                                        Order Service
+                                                |
+                              +-----------------+-----------------+
+                              |                                   |
+                              v                                   v
+                         CONFIRMED                            CANCELLED
 ```
 
----
+The initial `POST /api/orders` response returns the newly created order in `PENDING` status. Inventory processing happens asynchronously through Kafka. A later order lookup reflects the final `CONFIRMED` or `CANCELLED` state.
 
-### Order Service
-
-Handles order creation and order persistence.
+## Architecture
 
 ```text
-Port: 8081
-Database: orderflow
+                         +----------------------+
+                         |    Eureka Server     |
+                         |        :8761         |
+                         +----------+-----------+
+                                    |
+                          Service Registration
+                                    |
+              +---------------------+----------------------+
+              |                                            |
+              v                                            v
+     +------------------+                        +-------------------+
+     | Gateway Service  |                        |  Order Service    |
+     |      :9000       |----------------------->|      :8081        |
+     +--------+---------+                        +---------+---------+
+              |                                            |
+              |                                            |
+              |                                  OrderCreatedEvent
+              |                                            |
+              |                                            v
+              |                                    +---------------+
+              |                                    |     Kafka     |
+              |                                    | order-events  |
+              |                                    +-------+-------+
+              |                                            |
+              |                                            v
+              |                                  +-------------------+
+              +--------------------------------->| Inventory Service |
+                                                 |       :8082       |
+                                                 +---------+---------+
+                                                           |
+                                               InventoryResultEvent
+                                                           |
+                                                           v
+                                                   +---------------+
+                                                   |     Kafka     |
+                                                   |inventory-events|
+                                                   +-------+-------+
+                                                           |
+                                                           v
+                                                   Order Service
+
+Infrastructure:
+- PostgreSQL
+- Redis
+- Apache Kafka
+- Docker Compose
 ```
 
-Current capabilities:
+## Services
 
-- Create orders
-- Persist orders with PostgreSQL
-- Flyway database migrations
-- UUID-based primary keys
-- Optimistic locking
-- Kafka order event publishing
+### discovery-service
 
-Order table:
+Netflix Eureka service registry.
+
+- Port: `8761`
+- Registers and discovers OrderFlow microservices
+- Removes the need for hardcoded service locations
+
+### gateway-service
+
+Spring Cloud Gateway entry point.
+
+- Port: `9000`
+- Routes external API requests to registered services
+- Uses Eureka-based service discovery
+
+Current request flow:
 
 ```text
-orders
-├── id
-├── customer_id
-├── status
-├── total_amount
-├── currency
-├── version
-├── created_at
-└── updated_at
+Client
+  -> Gateway
+  -> Eureka service discovery
+  -> target microservice
 ```
 
-Example order schema:
+### order-service
 
-```sql
-CREATE TABLE orders
-(
-    id           UUID PRIMARY KEY,
-    customer_id  UUID           NOT NULL,
-    status       VARCHAR(32)    NOT NULL,
-    total_amount NUMERIC(19, 2) NOT NULL,
-    currency     VARCHAR(3)     NOT NULL DEFAULT 'USD',
-    version      BIGINT         NOT NULL DEFAULT 0,
-    created_at   TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at   TIMESTAMPTZ    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+Order lifecycle service.
 
-    CONSTRAINT chk_orders_total_amount
-        CHECK (total_amount >= 0)
-);
-```
+- Port: `8081`
+- Persists orders in PostgreSQL
+- New orders begin in `PENDING`
+- Publishes `OrderCreatedEvent`
+- Uses `orderId` as the Kafka message key
+- Consumes `InventoryResultEvent`
+- Updates order state asynchronously
 
----
-
-### Inventory Service
-
-Handles product inventory and inventory reservations.
+Current state transitions:
 
 ```text
-Port: 8082
-Database: inventory_db
-```
+PENDING
+  |
+  +-- inventory RESERVED --> CONFIRMED
+  |
+  +-- inventory REJECTED --> CANCELLED
 
-Current capabilities:
-
-- Create inventory
-- Query inventory by SKU
-- Update inventory quantity
-- Reserve inventory
-- Confirm reservations
-- Release reservations
-- Optimistic locking
-- Concurrency protection
-- Reservation idempotency foundation
-- Centralized exception handling
-- Flyway migrations
-- Eureka registration
-- Gateway routing
-
----
-
-## Inventory Domain
-
-Each inventory record is identified by a SKU.
-
-Example:
-
-```text
-SKU:
-IPHONE17PRO-256-BLK
-
-Product:
-iPhone 17 Pro 256GB Black
-```
-
-Inventory tracks both available and reserved stock:
-
-```text
-quantity
-reserved_quantity
-```
-
-Example:
-
-```text
-Initial stock
-
-quantity          = 10
-reserved_quantity = 0
-```
-
-After reserving 2 items:
-
-```text
-quantity          = 8
-reserved_quantity = 2
-```
-
----
-
-## Inventory Reservation Lifecycle
-
-Inventory reservations use three states:
-
-```text
-RESERVED
 CONFIRMED
-RELEASED
+  |
+  +-- future payment / fulfillment flow --> COMPLETED
 ```
 
-### Reserve
+### inventory-service
 
-An order temporarily reserves inventory.
+Inventory and reservation service.
+
+- Port: `8082`
+- PostgreSQL persistence
+- Inventory CRUD
+- Inventory reservation workflow
+- Idempotent reservation using `orderId + sku`
+- Optimistic locking with JPA `@Version`
+- Handles concurrent reservation attempts
+- Publishes inventory processing results to Kafka
+
+Reservation behavior:
 
 ```text
-Before
-
-quantity          = 10
-reserved_quantity = 0
-
-Reserve 2
-
-After
-
-quantity          = 8
-reserved_quantity = 2
-status            = RESERVED
+available inventory
+      |
+      v
+reserve(orderId, sku, quantity)
+      |
+      +-- success
+      |     quantity -= requested
+      |     reservedQuantity += requested
+      |     reservation status = RESERVED
+      |
+      +-- inventory missing / insufficient
+            publish REJECTED result
 ```
 
-### Confirm
+## Kafka Event Flow
 
-When the order successfully completes, reserved inventory is permanently consumed.
+### Topic: `order-events`
 
-```text
-Before
-
-quantity          = 8
-reserved_quantity = 2
-status            = RESERVED
-
-After
-
-quantity          = 8
-reserved_quantity = 0
-status            = CONFIRMED
-```
-
-### Release
-
-If the order fails, reserved stock is returned to available inventory.
-
-```text
-Before
-
-quantity          = 8
-reserved_quantity = 2
-status            = RESERVED
-
-After
-
-quantity          = 10
-reserved_quantity = 0
-status            = RELEASED
-```
-
----
-
-## Inventory API
-
-All APIs can be accessed directly through Inventory Service during development:
-
-```text
-http://localhost:8082
-```
-
-or through the API Gateway:
-
-```text
-http://localhost:9000
-```
-
-### Create Inventory
-
-```http
-POST /api/inventory
-```
-
-Example request:
-
-```json
-{
-  "sku": "IPHONE17PRO-256-BLK",
-  "productName": "iPhone 17 Pro 256GB Black",
-  "quantity": 10
-}
-```
-
----
-
-### Get Inventory
-
-```http
-GET /api/inventory/{sku}
-```
-
-Example:
-
-```http
-GET /api/inventory/IPHONE17PRO-256-BLK
-```
-
----
-
-### Update Inventory
-
-```http
-PUT /api/inventory/{sku}
-```
-
-Example request:
-
-```json
-{
-  "quantity": 20
-}
-```
-
----
-
-### Reserve Inventory
-
-```http
-POST /api/inventory/reserve
-```
+Produced by `order-service`.
 
 Example:
 
 ```json
 {
-  "orderId": "3b3d7971-6be7-4562-8ab7-6860aa690407",
-  "sku": "IPHONE17PRO-256-BLK",
-  "quantity": 2
+  "eventId": "842523a6-8818-456c-9dad-5c42b6f62bc5",
+  "orderId": "53bcb071-f72e-4e26-ac11-5291e7c3ed96",
+  "customerId": "11111111-1111-1111-1111-111111111113",
+  "status": "PENDING",
+  "totalAmount": 1299.99,
+  "currency": "USD",
+  "items": [
+    {
+      "sku": "IPHONE17PRO-256-BLK",
+      "quantity": 1
+    }
+  ],
+  "occurredAt": "2026-09-23T17:35:44Z"
 }
 ```
 
-Example response:
+Kafka key:
+
+```text
+orderId
+```
+
+Consumed by `inventory-service`.
+
+### Topic: `inventory-events`
+
+Produced by `inventory-service`.
+
+Unified event:
 
 ```json
 {
-  "reservationId": "7eb3ad48-5412-4672-a5a7-e0907092db13",
-  "orderId": "3b3d7971-6be7-4562-8ab7-6860aa690407",
-  "sku": "IPHONE17PRO-256-BLK",
-  "quantity": 2,
-  "status": "RESERVED"
+  "eventId": "4f098f33-d095-46ca-8ba3-d3637cc18df0",
+  "orderId": "53bcb071-f72e-4e26-ac11-5291e7c3ed96",
+  "status": "RESERVED",
+  "reason": null,
+  "occurredAt": "2026-09-23T17:35:45Z"
 }
 ```
 
----
+Rejected example:
 
-### Confirm Reservation
+```json
+{
+  "eventId": "5b642854-55d7-49ab-a150-a91513ea331b",
+  "orderId": "53bcb071-f72e-4e26-ac11-5291e7c3ed96",
+  "status": "REJECTED",
+  "reason": "Insufficient inventory",
+  "occurredAt": "2026-09-23T17:35:45Z"
+}
+```
+
+Consumed by `order-service`.
+
+Result mapping:
+
+```text
+RESERVED -> CONFIRMED
+REJECTED -> CANCELLED
+```
+
+## Example End-to-End Request
+
+Create an order through the Gateway:
 
 ```http
-POST /api/inventory/reservations/{orderId}/{sku}/confirm
+POST http://localhost:9000/api/orders
+Content-Type: application/json
 ```
 
-Example:
+```json
+{
+  "customerId": "11111111-1111-1111-1111-111111111113",
+  "totalAmount": 1299.99,
+  "currency": "USD",
+  "items": [
+    {
+      "sku": "IPHONE17PRO-256-BLK",
+      "quantity": 1
+    }
+  ]
+}
+```
+
+Initial response:
+
+```json
+{
+  "id": "f8cecd57-7f35-4586-af53-2464227b75f1",
+  "customerId": "11111111-1111-1111-1111-111111111113",
+  "status": "PENDING",
+  "totalAmount": 1299.99,
+  "currency": "USD",
+  "version": 0
+}
+```
+
+Because inventory processing is asynchronous, `PENDING` is expected in the create response.
+
+After Kafka processing:
 
 ```text
-POST /api/inventory/reservations/
-3b3d7971-6be7-4562-8ab7-6860aa690407/
-IPHONE17PRO-256-BLK/
-confirm
+Inventory available:
+PENDING -> CONFIRMED
+
+Inventory unavailable:
+PENDING -> CANCELLED
 ```
 
-Result:
+## Inventory Concurrency and Idempotency
 
-```text
-RESERVED → CONFIRMED
-```
-
----
-
-### Release Reservation
-
-```http
-POST /api/inventory/reservations/{orderId}/{sku}/release
-```
-
-Result:
-
-```text
-RESERVED → RELEASED
-```
-
-Released inventory is returned to the available quantity.
-
----
-
-## Database Strategy
-
-OrderFlow follows a database-per-service design.
-
-```text
-Order Service
-     ↓
-orderflow database
-
-
-Inventory Service
-     ↓
-inventory_db database
-```
-
-Services do not directly query another service's database.
-
-Communication between services will occur through APIs and Kafka events.
-
----
-
-## Database Migrations
-
-Database schemas are managed using Flyway.
-
-Inventory Service currently contains:
-
-```text
-db/migration/
-
-V1__create_inventory_table.sql
-V2__add_inventory_reservation.sql
-```
-
-Flyway migration files are immutable after they have been applied.
-
-Future schema changes should use new migration files:
-
-```text
-V1
-↓
-V2
-↓
-V3
-↓
-V4
-```
-
-instead of modifying previous migrations.
-
----
-
-## Optimistic Locking
-
-Inventory uses JPA optimistic locking:
+Inventory reservation uses optimistic locking to protect stock updates under concurrent requests.
 
 ```java
 @Version
 private Long version;
 ```
 
-The version column prevents concurrent requests from silently overwriting each other's inventory updates.
+If multiple transactions attempt to reserve the last available unit, only a valid update can commit against the expected entity version.
 
-Conceptually, Hibernate performs an update similar to:
-
-```sql
-UPDATE inventory
-SET quantity = ?,
-    reserved_quantity = ?,
-    version = ?
-WHERE id = ?
-  AND version = ?;
-```
-
-If another transaction has already modified the inventory record, the version no longer matches and the second update fails.
-
----
-
-## Concurrency Protection
-
-A concurrency integration test verifies that two orders cannot reserve the last available item simultaneously.
-
-Test scenario:
+Inventory reservations also protect against duplicate processing:
 
 ```text
-Initial inventory
-
-quantity          = 1
-reserved_quantity = 0
+(orderId, sku)
 ```
 
-Two separate orders attempt to reserve the item concurrently:
+If the same order event is delivered more than once with the same quantity, the existing reservation is returned rather than deducting inventory twice.
+
+This is important because Kafka consumers should be designed for at-least-once delivery semantics.
+
+## Persistence
+
+OrderFlow currently uses PostgreSQL for transactional data.
+
+Database migrations are managed with Flyway.
+
+Current persistence responsibilities include:
 
 ```text
-Order A ──┐
-          ├── reserve 1 item
-Order B ──┘
+order-service
+  -> orders
+
+inventory-service
+  -> inventory
+  -> inventory reservations
 ```
 
-Both transactions may initially read:
-
-```text
-quantity = 1
-version  = 0
-```
-
-Only one transaction can successfully update the row.
-
-Expected final state:
-
-```text
-Successful reservations = 1
-Failed reservations     = 1
-
-quantity                 = 0
-reserved_quantity        = 1
-reservation rows         = 1
-```
-
-The losing transaction receives an optimistic locking conflict rather than overwriting the successful transaction.
-
-This protects the inventory system from overselling under concurrent requests.
-
----
-
-## Transaction Management
-
-Inventory reservation operations run inside database transactions.
-
-Example:
-
-```text
-Reserve inventory
-       │
-       ├── decrease available quantity
-       │
-       ├── increase reserved quantity
-       │
-       └── create reservation
-```
-
-All operations succeed together or roll back together.
-
-This prevents inconsistent states such as:
-
-```text
-inventory decreased
-BUT
-reservation not created
-```
-
----
-
-## Reservation Idempotency
-
-Reservations are uniquely identified by:
-
-```text
-orderId + SKU
-```
-
-The database enforces:
-
-```text
-UNIQUE(order_id, sku)
-```
-
-This prevents the same order from accidentally creating duplicate reservations for the same SKU.
-
-This will become especially important when Kafka consumers are introduced because event delivery may occur more than once.
-
----
-
-## Exception Handling
-
-Inventory Service uses centralized exception handling with:
-
-```java
-@RestControllerAdvice
-```
-
-Current error cases include:
-
-```text
-404 Not Found
-Inventory SKU does not exist
-
-409 Conflict
-Duplicate SKU
-
-409 Conflict
-Insufficient inventory
-
-409 Conflict
-Optimistic locking conflict
-
-400 Bad Request
-Request validation failure
-```
-
----
+Redis is included in the local infrastructure for upcoming caching and distributed workflow features.
 
 ## Technology Stack
 
-### Backend
+| Area | Technology |
+|---|---|
+| Language | Java 21 |
+| Backend | Spring Boot 4.1.1 |
+| Service Discovery | Netflix Eureka |
+| API Gateway | Spring Cloud Gateway |
+| Messaging | Apache Kafka |
+| Database | PostgreSQL 16 |
+| Cache / Infrastructure | Redis 7 |
+| Persistence | Spring Data JPA / Hibernate |
+| Migrations | Flyway |
+| Build | Maven |
+| Containers | Docker / Docker Compose |
+| Testing | JUnit / Mockito / Postman |
+| Concurrency | JPA Optimistic Locking |
+| Architecture | Microservices / Event-Driven Architecture |
 
-- Java 21
-- Spring Boot 4.1.1
-- Spring MVC
-- Spring Data JPA
-- Spring Validation
-- Spring Cloud
-- Netflix Eureka
-- Spring Cloud Gateway
+## Local Infrastructure
 
-### Database
-
-- PostgreSQL 16
-- Flyway
-- Hibernate / JPA
-
-### Messaging
-
-- Apache Kafka
-
-### Cache
-
-- Redis
-
-### Infrastructure
-
-- Docker
-- Docker Compose
-
-### Testing
-
-- JUnit
-- Spring Boot Test
-- AssertJ
-- Concurrent integration testing
-
----
-
-## Docker Infrastructure
-
-Current local infrastructure:
+Docker Compose currently provides the main development infrastructure:
 
 ```text
-PostgreSQL
-Port: 5432
-
-Redis
-Port: 6379
-
-Kafka
-Port: 9092
+PostgreSQL :5432
+Redis      :6379
+Kafka      :9092
 ```
 
-Start infrastructure:
+Typical startup order:
+
+```text
+1. Docker infrastructure
+2. discovery-service
+3. gateway-service
+4. order-service
+5. inventory-service
+```
+
+Example:
 
 ```bash
 docker compose up -d
 ```
 
-Check containers:
+Then verify containers:
 
 ```bash
 docker ps
 ```
 
-Stop infrastructure:
-
-```bash
-docker compose down
-```
-
----
-
-## Recommended Local Startup Order
-
-```text
-1. Docker infrastructure
-   ├── PostgreSQL
-   ├── Redis
-   └── Kafka
-
-2. Discovery Service
-
-3. Order Service
-
-4. Inventory Service
-
-5. Gateway Service
-```
-
----
-
-## Current Request Flow
-
-Order API:
-
-```text
-Client
-  ↓
-API Gateway
-  ↓
-Eureka
-  ↓
-Order Service
-  ↓
-PostgreSQL
-```
-
-Inventory API:
-
-```text
-Client
-  ↓
-API Gateway
-  ↓
-Eureka
-  ↓
-Inventory Service
-  ↓
-PostgreSQL
-```
-
----
-
 ## Current Project Structure
 
 ```text
-OrderFlow
-│
-├── discovery-service
-│
-├── gateway-service
-│
-├── order-service
-│
-├── inventory-service
-│
+OrderFlow/
+├── discovery-service/
+├── gateway-service/
+├── order-service/
+├── inventory-service/
 ├── docker-compose.yml
-│
-├── pom.xml
-└── README.md
+└── pom.xml
 ```
 
----
+The project is organized as a Maven multi-module application.
 
-## Development Progress
+## Implemented Milestones
 
-### Day 1 — Infrastructure
+### Day 1 - Foundation
 
-Completed:
-
-- Maven multi-module project
-- Java 21
-- Spring Boot
-- Eureka Discovery Server
+- Java 21 / Spring Boot 4.1.1 project setup
+- Maven multi-module structure
+- Eureka discovery service
+- Docker Compose infrastructure
 - PostgreSQL
 - Redis
 - Kafka
-- Docker Compose
 
-### Day 2 — Order Service
+### Day 2 - Order Service
 
-Completed:
-
-- Order Service
-- PostgreSQL integration
-- JPA
-- Flyway
-- Order entity
+- Order entity and repository
+- PostgreSQL persistence
+- Flyway migrations
 - Create Order API
-- UUID primary keys
-- Database validation
+- Order status model
+- API Gateway routing
 
-### Day 3 — Gateway and Messaging
+### Day 3 - Kafka Producer
 
-Completed:
+- `OrderCreatedEvent`
+- Kafka JSON serialization
+- `OrderEventPublisher`
+- `order-events`
+- Kafka key = `orderId`
+- Event publication after order creation
+- Kafka console verification
 
-- API Gateway
-- Eureka-based service routing
-- Order Service routing
-- Kafka infrastructure
-- Order event publishing
+### Day 4 - Inventory Service
 
-### Day 4 — Inventory Service
-
-Completed:
-
-- Inventory Service
-- Independent inventory database
-- Flyway V1 and V2 migrations
 - Inventory CRUD
-- SKU lookup
-- Inventory reservations
-- Reserve inventory
-- Confirm reservation
-- Release reservation
+- PostgreSQL inventory persistence
+- Flyway migrations
+- Reserve / confirm / release reservation operations
+- Inventory reservation entity
+- Idempotent reservation handling
 - Optimistic locking
-- Transaction management
-- Reservation idempotency foundation
-- Centralized exception handling
-- Eureka registration
-- Gateway routing
-- Concurrent inventory reservation test
-- Overselling protection
+- Concurrent reservation testing
+- Centralized inventory exceptions
 
----
+### Day 5 - Event-Driven Order Workflow
 
-## Next Step — Day 5
+- Added order items to `OrderCreatedEvent`
+- Inventory Kafka consumer
+- Cross-service JSON event contracts
+- Inventory reservation triggered asynchronously
+- Unified `InventoryResultEvent`
+- `inventory-events` topic
+- Order Service Kafka consumer
+- `PENDING -> CONFIRMED` success flow
+- `PENDING -> CANCELLED` rejection flow
+- End-to-end success and insufficient-inventory tests
 
-The next stage will connect Order Service and Inventory Service through Kafka.
-
-Target flow:
+## Current Event-Driven Workflow
 
 ```text
-Client
-  ↓
 Create Order
-  ↓
-Order Service
-  ↓
+    |
+    v
+PENDING
+    |
+    v
 OrderCreatedEvent
-  ↓
+    |
+    v
 Kafka
-  ↓
-Inventory Service
-  ↓
+    |
+    v
 Reserve Inventory
-  ↓
-        ┌─────────────────────┐
-        │                     │
-        ▼                     ▼
-InventoryReservedEvent   InventoryRejectedEvent
-        │                     │
-        ▼                     ▼
-   Continue workflow      Compensate / Reject
+    |
+    +---------------------------+
+    |                           |
+    v                           v
+RESERVED                    REJECTED
+    |                           |
+    v                           v
+InventoryResultEvent      InventoryResultEvent
+    |                           |
+    +-------------+-------------+
+                  |
+                  v
+                Kafka
+                  |
+                  v
+            Order Service
+                  |
+        +---------+---------+
+        |                   |
+        v                   v
+   CONFIRMED            CANCELLED
 ```
 
-Planned work:
+## Next Steps
 
-- Kafka consumer in Inventory Service
-- Consume `OrderCreatedEvent`
-- Trigger inventory reservation
-- Publish `InventoryReservedEvent`
-- Publish `InventoryRejectedEvent`
-- Consumer idempotency
-- Retry handling
-- Event-driven order workflow
+Planned reliability work includes:
 
-Later stages will introduce:
+- Kafka `ErrorHandlingDeserializer`
+- Retry and backoff policies
+- Dead-letter topics
+- Saga-style compensation for multi-item reservation failures
+- Release previously reserved inventory when a later item fails
+- Transactional Outbox pattern
+- Additional integration and concurrency tests
 
-- Transactional Outbox
-- Saga workflow
-- Payment Service
-- Retry / Dead Letter Queue
-- Redis caching
-- Observability
-- Dockerized services
-- Kubernetes deployment
-- AWS deployment
+Later project phases will add payment and notification workflows while keeping the same event-driven architecture.
 
----
+## Design Goals
 
-## Project Goal
+OrderFlow is intentionally being built beyond basic CRUD. The project focuses on distributed-system concerns that commonly appear in production systems:
 
-OrderFlow is intended to demonstrate how a production-style distributed system handles:
+- asynchronous communication
+- eventual consistency
+- service decoupling
+- idempotency
+- concurrency control
+- event ordering through stable Kafka keys
+- failure handling
+- compensating transactions
+- database migration management
+- service discovery
+- centralized API routing
 
-```text
-Service discovery
-API gateway routing
-Database ownership
-Database migrations
-Distributed communication
-Kafka events
-Inventory reservation
-Concurrent updates
-Optimistic locking
-Idempotency
-Transactional consistency
-Saga workflows
-Failure recovery
-Observability
-Cloud deployment
-```
-
-The goal is not only to build CRUD APIs, but to demonstrate the engineering challenges involved in reliable distributed systems.
