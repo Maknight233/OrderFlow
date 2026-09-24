@@ -25,16 +25,23 @@ spring:
       group-id: inventory-service
       auto-offset-reset: earliest
 
-      key-deserializer:
-        org.apache.kafka.common.serialization.StringDeserializer
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
-      value-deserializer:
-        org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+      # Day 6: 外层使用 ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
 
       properties:
+        # 真正执行 JSON 反序列化的 delegate
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+
+        # 不使用 producer 发送过来的 Java class type header
         spring.json.use.type.headers: false
+
+        # inventory-service 本地对应的 event class
         spring.json.value.default.type: com.rom.orderflow.inventory.kafka.event.OrderCreatedEvent
+
+        # 允许反序列化这个 package
+        spring.json.trusted.packages: com.rom.orderflow.inventory.kafka.event
 
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer

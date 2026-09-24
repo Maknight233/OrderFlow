@@ -2,11 +2,11 @@
 
 OrderFlow is a distributed order processing platform built with Java 21, Spring Boot, Spring Cloud, PostgreSQL, Kafka, Redis, and Docker.
 
-The project is designed to demonstrate production-oriented microservice patterns such as service discovery, API gateway routing, event-driven communication, database migrations, optimistic locking, idempotent inventory reservation, and asynchronous order workflows.
+The project is designed to demonstrate production-oriented microservice patterns such as service discovery, API gateway routing, event-driven communication, database migrations, optimistic locking, idempotent inventory reservation, Kafka retry / dead-letter handling, Saga-style compensation, and asynchronous order workflows.
 
 ## Current Status
 
-OrderFlow currently supports an end-to-end Kafka-driven order and inventory workflow:
+OrderFlow currently supports an end-to-end Kafka-driven order and inventory workflow with retry / dead-letter handling for technical failures and Saga-style compensation for partial inventory reservation failures:
 
 ```text
 Client
@@ -163,8 +163,13 @@ Inventory and reservation service.
 - Inventory CRUD
 - Inventory reservation workflow
 - Idempotent reservation using `orderId + sku`
+- Idempotent release / compensation handling
 - Optimistic locking with JPA `@Version`
 - Handles concurrent reservation attempts
+- Kafka consumer retry with fixed backoff
+- Dead-letter publishing to `order-events-dlt`
+- `ErrorHandlingDeserializer` for deserialization failures
+- Saga-style compensation for partial multi-item reservation failures
 - Publishes inventory processing results to Kafka
 
 Reservation behavior:
@@ -255,6 +260,30 @@ RESERVED -> CONFIRMED
 REJECTED -> CANCELLED
 ```
 
+### Topic: `order-events-dlt`
+
+Failed `order-events` records that exhaust the configured retry policy are published to `order-events-dlt`.
+
+Current retry policy:
+
+```text
+Initial delivery
+    |
+    v
+Retry #1 after 2 seconds
+    |
+    v
+Retry #2 after 2 seconds
+    |
+    v
+order-events-dlt
+```
+
+This gives a total of three delivery attempts for retryable technical failures.
+
+Business failures such as insufficient inventory are handled by the inventory workflow and do not use the technical retry path.
+
+
 ## Example End-to-End Request
 
 Create an order through the Gateway:
@@ -324,6 +353,27 @@ If the same order event is delivered more than once with the same quantity, the 
 
 This is important because Kafka consumers should be designed for at-least-once delivery semantics.
 
+Inventory release is also idempotent. If a reservation is already in `RELEASED` state, calling `release(orderId, sku)` again returns the existing reservation without modifying inventory quantities again.
+
+For multi-item orders, successful reservations are tracked while items are processed. If a later item fails with a business exception, previously reserved items are released in reverse order as Saga compensating actions.
+
+```text
+Reserve Item A -> SUCCESS
+Reserve Item B -> FAILED
+        |
+        v
+Release Item A
+        |
+        v
+Publish REJECTED
+        |
+        v
+Order CANCELLED
+```
+
+Both `Inventory` and `InventoryReservation` use JPA `@Version` fields for optimistic locking.
+
+
 ## Persistence
 
 OrderFlow currently uses PostgreSQL for transactional data.
@@ -360,6 +410,7 @@ Redis is included in the local infrastructure for upcoming caching and distribut
 | Containers | Docker / Docker Compose |
 | Testing | JUnit / Mockito / Postman |
 | Concurrency | JPA Optimistic Locking |
+| Reliability | Kafka Retry / DLT / Saga Compensation |
 | Architecture | Microservices / Event-Driven Architecture |
 
 ## Local Infrastructure
@@ -464,6 +515,21 @@ The project is organized as a Maven multi-module application.
 - `PENDING -> CANCELLED` rejection flow
 - End-to-end success and insufficient-inventory tests
 
+### Day 6 - Kafka Reliability and Saga Compensation
+
+- Added `ErrorHandlingDeserializer` to the inventory Kafka consumer
+- Added Spring Kafka `DefaultErrorHandler`
+- Added fixed retry backoff: 2 retries with 2-second delay
+- Added `order-events-dlt`
+- Verified retryable consumer failure -> retry -> DLT flow
+- Separated business failures from technical failures
+- Added Saga-style compensation for partial multi-item reservations
+- Releases previously reserved inventory when a later item fails
+- Executes compensation in reverse order
+- Added idempotent release protection
+- Added optimistic locking to inventory reservations with JPA `@Version`
+- Verified repeated `release()` calls do not restore stock twice
+
 ## Current Event-Driven Workflow
 
 ```text
@@ -476,46 +542,64 @@ PENDING
 OrderCreatedEvent
     |
     v
-Kafka
+Kafka: order-events
     |
     v
-Reserve Inventory
+Inventory Service
     |
-    +---------------------------+
-    |                           |
-    v                           v
-RESERVED                    REJECTED
-    |                           |
-    v                           v
-InventoryResultEvent      InventoryResultEvent
-    |                           |
-    +-------------+-------------+
-                  |
-                  v
-                Kafka
-                  |
-                  v
-            Order Service
-                  |
-        +---------+---------+
-        |                   |
-        v                   v
-   CONFIRMED            CANCELLED
+    +---------------- Business Failure ----------------+
+    |                                                  |
+    |                                  partial reservation failure
+    |                                                  |
+    |                                                  v
+    |                                         Saga Compensation
+    |                                                  |
+    |                                                  v
+    |                                           release previous
+    |                                                  |
+    |                                                  v
+    |                                           REJECTED event
+    |                                                  |
+    |                                                  v
+    |                                             CANCELLED
+    |
+    +---------------- Technical Failure ---------------+
+    |                                                  |
+    |                                               retry
+    |                                                  |
+    |                                               retry
+    |                                                  |
+    |                                                  v
+    |                                         order-events-dlt
+    |
+    +---------------- Success -------------------------+
+                                                       |
+                                                       v
+                                                RESERVED event
+                                                       |
+                                                       v
+                                                inventory-events
+                                                       |
+                                                       v
+                                                 Order Service
+                                                       |
+                                                       v
+                                                   CONFIRMED
 ```
 
 ## Next Steps
 
-Planned reliability work includes:
+Planned reliability and workflow work includes:
 
-- Kafka `ErrorHandlingDeserializer`
-- Retry and backoff policies
-- Dead-letter topics
-- Saga-style compensation for multi-item reservation failures
-- Release previously reserved inventory when a later item fails
 - Transactional Outbox pattern
+- Reliable outbox publisher / relay
+- Outbox event status and retry handling
 - Additional integration and concurrency tests
+- Payment workflow
+- Notification workflow
+- Observability and operational metrics
 
-Later project phases will add payment and notification workflows while keeping the same event-driven architecture.
+Later project phases will keep the same event-driven architecture while expanding distributed workflow and reliability patterns.
 
 ## Design Goals
 

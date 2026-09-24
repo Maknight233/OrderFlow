@@ -13,6 +13,9 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -21,8 +24,9 @@ public class OrderCreatedEventConsumer {
     private final InventoryService inventoryService;
     private final InventoryEventPublisher eventPublisher;
 
-
-    public OrderCreatedEventConsumer(InventoryService inventoryService, InventoryEventPublisher eventPublisher) {
+    public OrderCreatedEventConsumer(
+            InventoryService inventoryService,
+            InventoryEventPublisher eventPublisher) {
         this.inventoryService = inventoryService;
         this.eventPublisher = eventPublisher;
     }
@@ -32,6 +36,8 @@ public class OrderCreatedEventConsumer {
             groupId = "inventory-service"
     )
     public void consume(OrderCreatedEvent event) {
+
+        List<OrderItemEvent> reservedItems = new ArrayList<>();
 
         try {
 
@@ -45,6 +51,18 @@ public class OrderCreatedEventConsumer {
                         );
 
                 inventoryService.reserve(request);
+
+                // 只有 reserve 成功之后才记录
+                reservedItems.add(item);
+
+                System.out.println(
+                        "Inventory reserved: orderId="
+                                + event.orderId()
+                                + ", sku="
+                                + item.sku()
+                                + ", quantity="
+                                + item.quantity()
+                );
             }
 
             InventoryResultEvent resultEvent =
@@ -67,6 +85,17 @@ public class OrderCreatedEventConsumer {
                  InsufficientInventoryException |
                  ReservedInventoryException ex) {
 
+            System.out.println(
+                    "Inventory reservation failed for order: "
+                            + event.orderId()
+                            + ", starting Saga compensation..."
+            );
+
+            compensate(
+                    event.orderId(),
+                    reservedItems
+            );
+
             InventoryResultEvent resultEvent =
                     new InventoryResultEvent(
                             UUID.randomUUID(),
@@ -82,6 +111,32 @@ public class OrderCreatedEventConsumer {
                     "InventoryRejectedEvent published for order: "
                             + event.orderId()
                             + " reason=" + ex.getMessage()
+            );
+        }
+    }
+
+    private void compensate(
+            UUID orderId,
+            List<OrderItemEvent> reservedItems) {
+
+        // Saga compensation 通常逆序执行
+        List<OrderItemEvent> reverseItems =
+                new ArrayList<>(reservedItems);
+
+        Collections.reverse(reverseItems);
+
+        for (OrderItemEvent item : reverseItems) {
+
+            inventoryService.release(
+                    orderId,
+                    item.sku()
+            );
+
+            System.out.println(
+                    "Saga compensation completed: orderId="
+                            + orderId
+                            + ", sku="
+                            + item.sku()
             );
         }
     }

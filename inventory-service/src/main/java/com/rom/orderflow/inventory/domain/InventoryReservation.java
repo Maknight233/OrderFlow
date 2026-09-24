@@ -40,6 +40,10 @@ public class InventoryReservation {
     @Column(nullable = false, length = 32)
     private ReservationStatus status;
 
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
