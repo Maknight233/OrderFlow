@@ -2,7 +2,10 @@ package com.rom.orderflow.order.kafka.publisher;
 
 import com.rom.orderflow.order.kafka.event.OrderCreatedEvent;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Component;
+
+import java.util.concurrent.CompletableFuture;
 
 @Component
 public class OrderEventPublisher {
@@ -16,9 +19,9 @@ public class OrderEventPublisher {
         this.kafkaTemplate = kafkaTemplate;
     }
 
-    public void publishOrderCreated(OrderCreatedEvent event) {
+    public CompletableFuture<SendResult<String, Object>> publishOrderCreated(OrderCreatedEvent event) {
 
-        kafkaTemplate.send(
+        return kafkaTemplate.send(
                 ORDER_EVENTS_TOPIC,
                 event.orderId().toString(),
                 event
