@@ -2,11 +2,18 @@
 
 OrderFlow is a distributed order processing platform built with Java 21, Spring Boot, Spring Cloud, PostgreSQL, Kafka, Redis, and Docker.
 
-The project is designed to demonstrate production-oriented microservice patterns such as service discovery, API gateway routing, event-driven communication, database migrations, optimistic locking, idempotent inventory reservation, Kafka retry / dead-letter handling, Saga-style compensation, and asynchronous order workflows.
+The project is designed to demonstrate production-oriented microservice patterns such as service discovery, API gateway routing, event-driven communication, database migrations, optimistic locking, Kafka retry / dead-letter handling, Saga-style compensation, Transactional Outbox, consumer idempotency, and asynchronous order workflows.
 
 ## Current Status
 
-OrderFlow currently supports an end-to-end Kafka-driven order and inventory workflow with retry / dead-letter handling for technical failures and Saga-style compensation for partial inventory reservation failures:
+OrderFlow currently supports an end-to-end Kafka-driven order and inventory workflow with:
+
+- asynchronous order processing
+- Kafka retry and dead-letter handling
+- Saga-style compensation for partial reservation failures
+- Transactional Outbox for reliable `OrderCreatedEvent` publication
+- consumer-side duplicate-event protection
+- optimistic locking for inventory concurrency
 
 ```text
 Client
@@ -17,35 +24,51 @@ API Gateway :9000
   v
 Order Service :8081
   |
-  | save order as PENDING
+  | @Transactional
   |
-  +---- OrderCreatedEvent ----------------------+
-  |                                             |
-  |                                   Kafka: order-events
-  |                                             |
-  |                                             v
-  |                                  Inventory Service :8082
-  |                                             |
-  |                                     reserve inventory
-  |                                             |
-  |                         +-------------------+-------------------+
-  |                         |                                       |
-  |                         v                                       v
-  |                  RESERVED                                  REJECTED
-  |                         |                                       |
-  |                         +----------- InventoryResultEvent ------+
-  |                                             |
-  |                                  Kafka: inventory-events
-  |                                             |
-  +---------------------------------------------+
-                                                |
-                                                v
-                                        Order Service
-                                                |
-                              +-----------------+-----------------+
-                              |                                   |
-                              v                                   v
-                         CONFIRMED                            CANCELLED
+  +---- save Order(PENDING)
+  |
+  +---- save OutboxEvent(PENDING)
+  |
+  v
+PostgreSQL
+  |
+  v
+Outbox Publisher
+  |
+  | poll pending events
+  | publish and wait for Kafka ACK
+  |
+  v
+Kafka: order-events
+  |
+  v
+Inventory Service :8082
+  |
+  | check processed_events
+  |
+  +---- duplicate event ----> ignore
+  |
+  v
+reserve inventory
+  |
+  +--------------------+--------------------+
+  |                                         |
+  v                                         v
+RESERVED                                REJECTED
+  |                                         |
+  +---------- InventoryResultEvent ---------+
+                    |
+                    v
+           Kafka: inventory-events
+                    |
+                    v
+             Order Service
+                    |
+          +---------+---------+
+          |                   |
+          v                   v
+     CONFIRMED            CANCELLED
 ```
 
 The initial `POST /api/orders` response returns the newly created order in `PENDING` status. Inventory processing happens asynchronously through Kafka. A later order lookup reflects the final `CONFIRMED` or `CANCELLED` state.
@@ -68,31 +91,40 @@ The initial `POST /api/orders` response returns the newly created order in `PEND
      |      :9000       |----------------------->|      :8081        |
      +--------+---------+                        +---------+---------+
               |                                            |
+              |                                    DB Transaction
               |                                            |
-              |                                  OrderCreatedEvent
-              |                                            |
-              |                                            v
-              |                                    +---------------+
-              |                                    |     Kafka     |
-              |                                    | order-events  |
-              |                                    +-------+-------+
-              |                                            |
-              |                                            v
-              |                                  +-------------------+
-              +--------------------------------->| Inventory Service |
-                                                 |       :8082       |
-                                                 +---------+---------+
-                                                           |
-                                               InventoryResultEvent
-                                                           |
-                                                           v
-                                                   +---------------+
-                                                   |     Kafka     |
-                                                   |inventory-events|
-                                                   +-------+-------+
-                                                           |
-                                                           v
-                                                   Order Service
+              |                              +-------------+-------------+
+              |                              |                           |
+              |                              v                           v
+              |                           orders                  outbox_events
+              |                                                         |
+              |                                                         v
+              |                                                Outbox Publisher
+              |                                                         |
+              |                                                  OrderCreatedEvent
+              |                                                         |
+              |                                                         v
+              |                                                  +---------------+
+              |                                                  |     Kafka     |
+              |                                                  | order-events  |
+              |                                                  +-------+-------+
+              |                                                          |
+              |                                                          v
+              |                                                +-------------------+
+              +----------------------------------------------->| Inventory Service |
+                                                               |       :8082       |
+                                                               +---------+---------+
+                                                                         |
+                                                             InventoryResultEvent
+                                                                         |
+                                                                         v
+                                                                 +---------------+
+                                                                 |     Kafka     |
+                                                                 |inventory-events|
+                                                                 +-------+-------+
+                                                                         |
+                                                                         v
+                                                                 Order Service
 
 Infrastructure:
 - PostgreSQL
@@ -135,7 +167,12 @@ Order lifecycle service.
 - Port: `8081`
 - Persists orders in PostgreSQL
 - New orders begin in `PENDING`
-- Publishes `OrderCreatedEvent`
+- Stores `OrderCreatedEvent` payloads in `outbox_events`
+- Writes the order and outbox record in the same database transaction
+- Uses a scheduled Outbox Publisher to poll `PENDING` events
+- Publishes `OrderCreatedEvent` to Kafka only through the outbox relay
+- Waits for Kafka send completion before marking the outbox event `PUBLISHED`
+- Keeps failed events `PENDING` so they can be retried automatically
 - Uses `orderId` as the Kafka message key
 - Consumes `InventoryResultEvent`
 - Updates order state asynchronously
@@ -164,6 +201,8 @@ Inventory and reservation service.
 - Inventory reservation workflow
 - Idempotent reservation using `orderId + sku`
 - Idempotent release / compensation handling
+- Consumer idempotency using `processed_events`
+- Duplicate `OrderCreatedEvent` messages are ignored by `eventId`
 - Optimistic locking with JPA `@Version`
 - Handles concurrent reservation attempts
 - Kafka consumer retry with fixed backoff
@@ -189,11 +228,104 @@ reserve(orderId, sku, quantity)
             publish REJECTED result
 ```
 
+## Transactional Outbox
+
+`order-service` no longer performs the database write and Kafka publish as two independent operations.
+
+The order and its outgoing event are persisted atomically:
+
+```text
+@Transactional
+      |
+      +-- INSERT orders
+      |
+      +-- INSERT outbox_events (PENDING)
+      |
+      v
+    COMMIT
+```
+
+The background publisher then relays pending events to Kafka:
+
+```text
+outbox_events
+     |
+     | status = PENDING
+     v
+Outbox Publisher
+     |
+     v
+KafkaTemplate.send(...)
+     |
+     v
+wait for ACK
+     |
+     +-- failure --> keep PENDING
+     |
+     +-- success --> status = PUBLISHED
+                    published_at = timestamp
+```
+
+This prevents an order from being committed while its corresponding `OrderCreatedEvent` is permanently lost because Kafka was temporarily unavailable.
+
+A broker-outage recovery test was verified:
+
+```text
+Kafka DOWN
+   |
+Create Order
+   |
+   +-- order saved
+   +-- outbox event saved as PENDING
+   |
+Kafka UP
+   |
+Outbox Publisher retries
+   |
+event published
+   |
+outbox status -> PUBLISHED
+```
+
+## Consumer Idempotency
+
+The Transactional Outbox provides at-least-once style delivery, so a message can still be delivered more than once in failure scenarios.
+
+`inventory-service` maintains a `processed_events` table keyed by `eventId`.
+
+```text
+OrderCreatedEvent
+      |
+      v
+processed_events contains eventId?
+      |
+  +---+---+
+  |       |
+ YES      NO
+  |       |
+ignore    process inventory
+          |
+          v
+      record eventId
+```
+
+Example table:
+
+```text
+processed_events
+-------------------------------
+event_id       UUID PRIMARY KEY
+event_type     VARCHAR
+processed_at   TIMESTAMP
+```
+
+Duplicate-delivery behavior was verified by re-publishing the same outbox event. The second delivery was ignored and inventory quantities remained unchanged.
+
 ## Kafka Event Flow
 
 ### Topic: `order-events`
 
-Produced by `order-service`.
+Produced by `order-service` through the Outbox Publisher.
 
 Example:
 
@@ -283,7 +415,6 @@ This gives a total of three delivery attempts for retryable technical failures.
 
 Business failures such as insufficient inventory are handled by the inventory workflow and do not use the technical retry path.
 
-
 ## Example End-to-End Request
 
 Create an order through the Gateway:
@@ -343,15 +474,13 @@ private Long version;
 
 If multiple transactions attempt to reserve the last available unit, only a valid update can commit against the expected entity version.
 
-Inventory reservations also protect against duplicate processing:
+Inventory reservations also protect against duplicate processing using:
 
 ```text
 (orderId, sku)
 ```
 
-If the same order event is delivered more than once with the same quantity, the existing reservation is returned rather than deducting inventory twice.
-
-This is important because Kafka consumers should be designed for at-least-once delivery semantics.
+If the same order is processed again, the existing reservation prevents inventory from being deducted twice.
 
 Inventory release is also idempotent. If a reservation is already in `RELEASED` state, calling `release(orderId, sku)` again returns the existing reservation without modifying inventory quantities again.
 
@@ -373,6 +502,7 @@ Order CANCELLED
 
 Both `Inventory` and `InventoryReservation` use JPA `@Version` fields for optimistic locking.
 
+Consumer-level idempotency adds another layer of protection by tracking processed Kafka `eventId` values.
 
 ## Persistence
 
@@ -385,10 +515,12 @@ Current persistence responsibilities include:
 ```text
 order-service
   -> orders
+  -> outbox_events
 
 inventory-service
   -> inventory
   -> inventory reservations
+  -> processed_events
 ```
 
 Redis is included in the local infrastructure for upcoming caching and distributed workflow features.
@@ -410,7 +542,7 @@ Redis is included in the local infrastructure for upcoming caching and distribut
 | Containers | Docker / Docker Compose |
 | Testing | JUnit / Mockito / Postman |
 | Concurrency | JPA Optimistic Locking |
-| Reliability | Kafka Retry / DLT / Saga Compensation |
+| Reliability | Kafka Retry / DLT / Saga Compensation / Transactional Outbox / Consumer Idempotency |
 | Architecture | Microservices / Event-Driven Architecture |
 
 ## Local Infrastructure
@@ -530,74 +662,128 @@ The project is organized as a Maven multi-module application.
 - Added optimistic locking to inventory reservations with JPA `@Version`
 - Verified repeated `release()` calls do not restore stock twice
 
+### Day 7 - Transactional Outbox and Consumer Idempotency
+
+- Added `outbox_events` table to `order-service`
+- Added `OutboxEvent`, `OutboxStatus`, and `OutboxEventRepository`
+- Persisted `Order` and `OutboxEvent` in the same database transaction
+- Removed direct Kafka publication from the create-order transaction
+- Added scheduled polling Outbox Publisher
+- Waited for Kafka send completion before marking events `PUBLISHED`
+- Kept failed events `PENDING` for automatic retry
+- Verified Kafka broker outage -> pending outbox -> recovery -> successful publication
+- Added `processed_events` table to `inventory-service`
+- Added processed-event tracking by Kafka `eventId`
+- Ignored duplicate `OrderCreatedEvent` deliveries
+- Verified duplicate delivery does not reserve inventory twice
+
 ## Current Event-Driven Workflow
 
 ```text
 Create Order
     |
     v
-PENDING
++-----------------------+
+| DB Transaction        |
+|                       |
+| orders                |
+| outbox_events:PENDING |
++-----------+-----------+
+            |
+            v
+     Outbox Publisher
+            |
+            v
+      Kafka: order-events
+            |
+            v
+     Inventory Service
+            |
+            v
+  processed_events check
+            |
+     +------+------+
+     |             |
+ duplicate       new event
+     |             |
+   ignore           v
+                Reserve Items
+                     |
+        +------------+------------+
+        |                         |
+        v                         v
+     SUCCESS                 BUSINESS FAILURE
+        |                         |
+        |                 Saga Compensation
+        |                         |
+        v                         v
+    RESERVED                  REJECTED
+        |                         |
+        +-----------+-------------+
+                    |
+                    v
+          Kafka: inventory-events
+                    |
+                    v
+             Order Service
+                    |
+          +---------+---------+
+          |                   |
+          v                   v
+     CONFIRMED            CANCELLED
+
+Technical Kafka consumer failure:
+order-events
     |
     v
-OrderCreatedEvent
+retry
     |
     v
-Kafka: order-events
+retry
     |
     v
-Inventory Service
-    |
-    +---------------- Business Failure ----------------+
-    |                                                  |
-    |                                  partial reservation failure
-    |                                                  |
-    |                                                  v
-    |                                         Saga Compensation
-    |                                                  |
-    |                                                  v
-    |                                           release previous
-    |                                                  |
-    |                                                  v
-    |                                           REJECTED event
-    |                                                  |
-    |                                                  v
-    |                                             CANCELLED
-    |
-    +---------------- Technical Failure ---------------+
-    |                                                  |
-    |                                               retry
-    |                                                  |
-    |                                               retry
-    |                                                  |
-    |                                                  v
-    |                                         order-events-dlt
-    |
-    +---------------- Success -------------------------+
-                                                       |
-                                                       v
-                                                RESERVED event
-                                                       |
-                                                       v
-                                                inventory-events
-                                                       |
-                                                       v
-                                                 Order Service
-                                                       |
-                                                       v
-                                                   CONFIRMED
+order-events-dlt
+```
+
+## Reliability Guarantees Implemented
+
+The current design combines several layers of protection:
+
+```text
+Optimistic Locking
+    -> protects concurrent inventory updates
+
+Idempotent Reservation
+    -> protects repeated reserve requests
+
+Idempotent Release
+    -> protects repeated compensation
+
+Kafka Retry + DLT
+    -> handles retryable consumer-side technical failures
+
+Saga Compensation
+    -> restores earlier reservations after later business failure
+
+Transactional Outbox
+    -> prevents committed orders from losing outgoing events
+
+Consumer Idempotency
+    -> prevents duplicate Kafka events from applying inventory changes twice
 ```
 
 ## Next Steps
 
 Planned reliability and workflow work includes:
 
-- Transactional Outbox pattern
-- Reliable outbox publisher / relay
-- Outbox event status and retry handling
-- Additional integration and concurrency tests
-- Payment workflow
-- Notification workflow
-- Observability and operational metrics
+- concurrency-safe outbox publishing for multiple `order-service` instances
+- outbox retry metadata such as `retry_count`, `last_error`, and `next_retry_at`
+- row claiming / locking such as `FOR UPDATE SKIP LOCKED`
+- cleanup / retention strategy for old `PUBLISHED` outbox events
+- additional integration and concurrency tests
+- payment workflow
+- notification workflow
+- observability and operational metrics
 
 Later project phases will keep the same event-driven architecture while expanding distributed workflow and reliability patterns.
 
@@ -613,7 +799,8 @@ OrderFlow is intentionally being built beyond basic CRUD. The project focuses on
 - event ordering through stable Kafka keys
 - failure handling
 - compensating transactions
+- reliable event publication
+- duplicate-event protection
 - database migration management
 - service discovery
 - centralized API routing
-
