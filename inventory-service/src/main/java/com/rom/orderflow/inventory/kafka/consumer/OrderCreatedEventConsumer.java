@@ -1,5 +1,6 @@
 package com.rom.orderflow.inventory.kafka.consumer;
 
+import com.rom.orderflow.inventory.domain.ProcessedEvent;
 import com.rom.orderflow.inventory.dto.ReserveInventoryRequest;
 import com.rom.orderflow.inventory.error.InsufficientInventoryException;
 import com.rom.orderflow.inventory.error.InventoryNotFoundException;
@@ -8,11 +9,13 @@ import com.rom.orderflow.inventory.kafka.event.InventoryResultEvent;
 import com.rom.orderflow.inventory.kafka.event.OrderCreatedEvent;
 import com.rom.orderflow.inventory.kafka.event.OrderItemEvent;
 import com.rom.orderflow.inventory.kafka.publisher.InventoryEventPublisher;
+import com.rom.orderflow.inventory.repository.ProcessedEventRepository;
 import com.rom.orderflow.inventory.service.InventoryService;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -23,12 +26,14 @@ public class OrderCreatedEventConsumer {
 
     private final InventoryService inventoryService;
     private final InventoryEventPublisher eventPublisher;
+    private final ProcessedEventRepository processedEventRepository;
 
     public OrderCreatedEventConsumer(
             InventoryService inventoryService,
-            InventoryEventPublisher eventPublisher) {
+            InventoryEventPublisher eventPublisher, ProcessedEventRepository processedEventRepository) {
         this.inventoryService = inventoryService;
         this.eventPublisher = eventPublisher;
+        this.processedEventRepository = processedEventRepository;
     }
 
     @KafkaListener(
@@ -36,6 +41,21 @@ public class OrderCreatedEventConsumer {
             groupId = "inventory-service"
     )
     public void consume(OrderCreatedEvent event) {
+
+        // ==============================
+        // IDEMPOTENCY CHECK
+        // ==============================
+        if (processedEventRepository.existsById(event.eventId())) {
+
+            System.out.println(
+                    "Duplicate OrderCreatedEvent ignored: eventId="
+                            + event.eventId()
+                            + ", orderId="
+                            + event.orderId()
+            );
+
+            return;
+        }
 
         List<OrderItemEvent> reservedItems = new ArrayList<>();
 
@@ -81,6 +101,11 @@ public class OrderCreatedEventConsumer {
                             + event.orderId()
             );
 
+            // ==============================
+            // IDEMPOTENCY RECORD
+            // ==============================
+            markEventProcessed(event);
+
         } catch (InventoryNotFoundException |
                  InsufficientInventoryException |
                  ReservedInventoryException ex) {
@@ -112,7 +137,22 @@ public class OrderCreatedEventConsumer {
                             + event.orderId()
                             + " reason=" + ex.getMessage()
             );
+
+            // REJECTED 也是“已经成功处理过的事件”
+            markEventProcessed(event);
         }
+    }
+
+    private void markEventProcessed(OrderCreatedEvent event) {
+
+        ProcessedEvent processedEvent =
+                ProcessedEvent.builder()
+                        .eventId(event.eventId())
+                        .eventType("ORDER_CREATED")
+                        .processedAt(LocalDateTime.now())
+                        .build();
+
+        processedEventRepository.save(processedEvent);
     }
 
     private void compensate(
