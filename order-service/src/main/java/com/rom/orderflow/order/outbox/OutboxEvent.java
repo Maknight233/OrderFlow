@@ -3,6 +3,7 @@ package com.rom.orderflow.order.outbox;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -39,4 +40,31 @@ public class OutboxEvent {
 
     @Column(name = "published_at")
     private LocalDateTime publishedAt;
+
+    @Column(name = "retry_count", nullable = false)
+    private int retryCount;
+
+    @Column(name = "next_attempt_at", nullable = false)
+    private Instant nextAttemptAt;
+
+    @Column(name = "last_error")
+    private String lastError;
+
+    @Column(name = "locked_at")
+    private Instant lockedAt;
+
+    @Column(name = "locked_by")
+    private String lockedBy;
+
+    @PrePersist
+    public void prePersist() {
+
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+
+        if (nextAttemptAt == null) {
+            nextAttemptAt = Instant.now();
+        }
+    }
 }
