@@ -13,6 +13,7 @@ import com.rom.orderflow.inventory.repository.InventoryReservationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.rom.orderflow.inventory.workflow.*;
 
 import java.util.UUID;
 
@@ -22,6 +23,7 @@ public class InventoryService {
 
     private final InventoryRepository inventoryRepository;
     private final InventoryReservationRepository reservationRepository;
+    private final InventoryWorkflowLock workflowLock;
 
     @Transactional
     public InventoryResponse createInventory(CreateInventoryRequest request) {
@@ -75,6 +77,13 @@ public class InventoryService {
             ReserveInventoryRequest request
     ) {
 
+        InventoryWorkflow workflow = workflowLock.lock(request.orderId());
+        if (workflow.getState() == InventoryWorkflowState.RELEASED
+                || workflow.getState() == InventoryWorkflowState.REJECTED
+                || workflow.getState() == InventoryWorkflowState.CONFIRMED) {
+            throw new ReservedInventoryException("Inventory workflow is already final: " + workflow.getState());
+        }
+
         var existing = reservationRepository.findByOrderIdAndSku(
                 request.orderId(),
                 request.sku()
@@ -84,11 +93,18 @@ public class InventoryService {
 
             InventoryReservation reservation = existing.get();
 
+            if (reservation.getStatus() == ReservationStatus.RELEASED) {
+                throw new ReservedInventoryException("Released reservation cannot be reserved again");
+            }
             if (reservation.getQuantity().equals(request.quantity())) {
                 return toReservationResponse(reservation);
             }
 
             throw new ReservedInventoryException("Reservation already exists with different quantity");
+        }
+
+        if (workflow.getState() == InventoryWorkflowState.RESERVED) {
+            throw new ReservedInventoryException("Cannot add items to an already reserved inventory workflow");
         }
 
         Inventory inventory = inventoryRepository
@@ -150,6 +166,12 @@ public class InventoryService {
     @Transactional
     public ReservationResponse confirm(UUID orderId, String sku) {
 
+        InventoryWorkflow workflow = workflowLock.lock(orderId);
+        if (workflow.getState() == InventoryWorkflowState.RELEASED
+                || workflow.getState() == InventoryWorkflowState.REJECTED) {
+            throw new IllegalStateException("Final inventory workflow cannot be confirmed");
+        }
+
         InventoryReservation reservation =
                 reservationRepository.findByOrderIdAndSku(orderId, sku)
                         .orElseThrow(() ->
@@ -190,6 +212,11 @@ public class InventoryService {
 
     @Transactional
     public ReservationResponse release(UUID orderId, String sku) {
+
+        InventoryWorkflow workflow = workflowLock.lock(orderId);
+        if (workflow.getState() == InventoryWorkflowState.CONFIRMED) {
+            throw new IllegalStateException("Confirmed inventory workflow cannot be released");
+        }
 
         InventoryReservation reservation =
                 reservationRepository.findByOrderIdAndSku(orderId, sku)

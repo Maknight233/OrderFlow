@@ -667,6 +667,10 @@ Stale PROCESSING event recovery
 
 ## Current Development Status
 
+Day 9 Saga Workflow development (steps 1–9): see [workflow, recovery APIs, and rollout notes](docs/day9-saga-workflow.md).
+Step 10 adds [isolated integration tests and run instructions](integration-tests/README.md).
+See the [latest integration test summary](docs/day9-integration-test-summary.md) for executed scenarios and results.
+
 Completed:
 
 ```text

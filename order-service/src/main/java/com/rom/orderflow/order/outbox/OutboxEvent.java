@@ -2,7 +2,6 @@ package com.rom.orderflow.order.outbox;
 
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -15,56 +14,34 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class OutboxEvent {
-
     @Id
     private UUID id;
-
-    @Column(name = "aggregate_type", nullable = false)
+    @Column(nullable = false)
     private String aggregateType;
-
-    @Column(name = "aggregate_id", nullable = false)
+    @Column(nullable = false)
     private UUID aggregateId;
-
-    @Column(name = "event_type", nullable = false)
+    @Column(nullable = false)
     private String eventType;
-
     @Column(nullable = false, columnDefinition = "TEXT")
     private String payload;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OutboxStatus status;
-
-    @Column(name = "created_at", nullable = false)
+    @Column(nullable = false)
     private LocalDateTime createdAt;
-
-    @Column(name = "published_at")
     private LocalDateTime publishedAt;
-
-    @Column(name = "retry_count", nullable = false)
+    @Column(nullable = false)
     private int retryCount;
-
-    @Column(name = "next_attempt_at", nullable = false)
+    @Column(nullable = false)
     private Instant nextAttemptAt;
-
-    @Column(name = "last_error")
     private String lastError;
-
-    @Column(name = "locked_at")
     private Instant lockedAt;
-
-    @Column(name = "locked_by")
+    @Column(length = 100)
     private String lockedBy;
 
     @PrePersist
-    public void prePersist() {
-
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
-
-        if (nextAttemptAt == null) {
-            nextAttemptAt = Instant.now();
-        }
+    void onCreate() {
+        if (createdAt == null) createdAt = LocalDateTime.now();
+        if (nextAttemptAt == null) nextAttemptAt = Instant.now();
     }
 }

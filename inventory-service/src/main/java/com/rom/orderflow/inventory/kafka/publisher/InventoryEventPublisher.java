@@ -1,26 +1,18 @@
 package com.rom.orderflow.inventory.kafka.publisher;
 
-import com.rom.orderflow.inventory.kafka.event.InventoryResultEvent;
+import com.rom.orderflow.inventory.kafka.event.WorkflowEvent;
+import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Component;
+import java.util.concurrent.CompletableFuture;
 
 @Component
+@RequiredArgsConstructor
 public class InventoryEventPublisher {
-
-    private static final String INVENTORY_EVENTS_TOPIC = "inventory-events";
-
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    public InventoryEventPublisher(
-            KafkaTemplate<String, Object> kafkaTemplate) {
-        this.kafkaTemplate = kafkaTemplate;
-    }
-
-    public void publish(InventoryResultEvent event) {
-        kafkaTemplate.send(
-                INVENTORY_EVENTS_TOPIC,
-                event.orderId().toString(),
-                event
-        );
+    public CompletableFuture<SendResult<String, Object>> publish(WorkflowEvent event) {
+        return kafkaTemplate.send("inventory-events", event.orderId().toString(), event);
     }
 }

@@ -1,83 +1,51 @@
 package com.rom.orderflow.order.service;
 
-import com.rom.orderflow.order.outbox.OutboxEvent;
-import com.rom.orderflow.order.outbox.OutboxStatus;
+import com.rom.orderflow.order.outbox.*;
 import com.rom.orderflow.order.repository.OutboxEventRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class OutboxStateService {
-
-    private static final int MAX_RETRIES = 5;
-    private static final Duration BASE_DELAY = Duration.ofSeconds(5);
-
-    private final OutboxEventRepository outboxEventRepository;
-
-    public OutboxStateService(
-            OutboxEventRepository outboxEventRepository) {
-        this.outboxEventRepository = outboxEventRepository;
-    }
+    private final OutboxEventRepository repository;
+    @Value("${orderflow.outbox.max-attempts:5}")
+    private int maxAttempts;
 
     @Transactional
-    public void markPublished(UUID eventId) {
-
-        OutboxEvent event = outboxEventRepository.findById(eventId)
-                .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "Outbox event not found: " + eventId));
-
-        event.setStatus(OutboxStatus.PUBLISHED);
-        event.setPublishedAt(LocalDateTime.now());
-
-        event.setLockedAt(null);
-        event.setLockedBy(null);
-        event.setLastError(null);
-    }
-
-    @Transactional
-    public void markFailed(UUID eventId, Exception exception) {
-
-        OutboxEvent event = outboxEventRepository.findById(eventId)
-                .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "Outbox event not found: " + eventId));
-
-        int retryCount = event.getRetryCount() + 1;
-
-        event.setRetryCount(retryCount);
-
-        String errorMessage = exception.getMessage();
-
-        if (errorMessage != null && errorMessage.length() > 2000) {
-            errorMessage = errorMessage.substring(0, 2000);
+    public void markPublished(UUID eventId, String token) {
+        if (repository.markPublished(eventId, token) == 0) {
+            log.warn("Ignored acknowledgement from expired outbox claim: eventId={}", eventId);
         }
+    }
 
-        event.setLastError(errorMessage);
-
+    @Transactional
+    public void markFailed(UUID eventId, String token, Exception exception) {
+        OutboxEvent event = repository.findForUpdate(eventId).orElseThrow();
+        if (event.getStatus() != OutboxStatus.PROCESSING || !token.equals(event.getLockedBy())) {
+            log.warn("Ignored failure from expired outbox claim: eventId={}", eventId);
+            return;
+        }
+        int attempt = event.getRetryCount() + 1;
+        event.setRetryCount(attempt);
+        String error = exception.toString();
+        event.setLastError(error.substring(0, Math.min(error.length(), 2000)));
         event.setLockedAt(null);
         event.setLockedBy(null);
-
-        if (retryCount >= MAX_RETRIES) {
-
+        if (attempt >= maxAttempts) {
             event.setStatus(OutboxStatus.FAILED);
-
+            log.error("Outbox exhausted publishing attempts: eventId={}, aggregateId={}",
+                    eventId, event.getAggregateId());
         } else {
-
             event.setStatus(OutboxStatus.PENDING);
-
-            long delaySeconds =
-                    BASE_DELAY.getSeconds()
-                            * (1L << (retryCount - 1));
-
-            event.setNextAttemptAt(
-                    Instant.now().plusSeconds(delaySeconds)
-            );
+            long delay = Math.min(300, 5L << Math.min(attempt - 1, 6));
+            event.setNextAttemptAt(Instant.now().plusSeconds(delay));
         }
     }
 }

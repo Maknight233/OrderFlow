@@ -1,58 +1,48 @@
+server:
+  port: 8082
+
 spring:
   application:
     name: inventory-service
-
   datasource:
     url: jdbc:postgresql://localhost:5432/inventory_db
     username: orderflow
     password: orderflow
-
   jpa:
     hibernate:
       ddl-auto: validate
     open-in-view: false
-    properties:
-      hibernate:
-        format_sql: true
-
   flyway:
     enabled: true
-
+    locations: classpath:db/migration
   kafka:
     bootstrap-servers: localhost:9092
-
-    consumer:
-      group-id: inventory-service
-      auto-offset-reset: earliest
-
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-
-      # Day 6: 外层使用 ErrorHandlingDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
-
-      properties:
-        # 真正执行 JSON 反序列化的 delegate
-        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
-
-        # 不使用 producer 发送过来的 Java class type header
-        spring.json.use.type.headers: false
-
-        # inventory-service 本地对应的 event class
-        spring.json.value.default.type: com.rom.orderflow.inventory.kafka.event.OrderCreatedEvent
-
-        # 允许反序列化这个 package
-        spring.json.trusted.packages: com.rom.orderflow.inventory.kafka.event
-
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
-
-server:
-  port: 8082
+      properties:
+        acks: all
+        enable.idempotence: true
+        max.block.ms: 5000
+        request.timeout.ms: 10000
+        delivery.timeout.ms: 15000
+    consumer:
+      group-id: inventory-service
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: com.rom.orderflow.inventory.kafka.event.WorkflowEvent
+        spring.json.trusted.packages: com.rom.orderflow.inventory.kafka.event
+    listener:
+      ack-mode: record
 
 eureka:
   client:
-    service-url:
+    serviceUrl:
       defaultZone: http://localhost:8761/eureka/
 
 management:
@@ -60,3 +50,10 @@ management:
     web:
       exposure:
         include: health,info
+
+orderflow:
+  outbox:
+    batch-size: 10
+    publish-delay-ms: 2000
+    processing-timeout-seconds: 120
+    max-attempts: 5
