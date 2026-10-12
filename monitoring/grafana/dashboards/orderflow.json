@@ -1,0 +1,353 @@
+{
+  "uid": "orderflow-overview",
+  "title": "OrderFlow observability",
+  "schemaVersion": 40,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "tags": [
+    "orderflow",
+    "day10"
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Service scrape availability",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "up{job=\"orderflow\"}",
+          "refId": "A",
+          "legendFormat": "{{application}} {{status}} {{state}} {{outcome}} {{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "Dependency health",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "probe_success{job=\"orderflow-health\"}",
+          "refId": "A",
+          "legendFormat": "{{application}} {{status}} {{state}} {{outcome}} {{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Outbox events by status",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "max by (application,status) (orderflow_outbox_events)",
+          "refId": "A",
+          "legendFormat": "{{application}} {{status}} {{state}} {{outcome}} {{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Oldest unpublished event",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "orderflow_outbox_oldest_age_seconds",
+          "refId": "A",
+          "legendFormat": "{{application}} {{status}} {{state}} {{outcome}} {{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "title": "Outbox publish attempts / sec",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (application,outcome) (rate(orderflow_outbox_attempts_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{application}} {{status}} {{state}} {{outcome}} {{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Outbox publish p95",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le,application) (rate(orderflow_outbox_publish_seconds_bucket[5m])))",
+          "refId": "A",
+          "legendFormat": "{{application}} {{status}} {{state}} {{outcome}} {{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "title": "Saga orders by state",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "max by (application,state) (orderflow_saga_orders)",
+          "refId": "A",
+          "legendFormat": "{{application}} {{status}} {{state}} {{outcome}} {{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "title": "Saga transitions / sec",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (to) (rate(orderflow_saga_transitions_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{application}} {{status}} {{state}} {{outcome}} {{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 9,
+      "title": "Saga completion p95",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le,outcome) (rate(orderflow_saga_duration_seconds_bucket[5m])))",
+          "refId": "A",
+          "legendFormat": "{{application}} {{status}} {{state}} {{outcome}} {{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "title": "Saga timeouts and retries",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "{__name__=~\"orderflow_saga_(timeouts|retries)_total\"}",
+          "refId": "A",
+          "legendFormat": "{{application}} {{status}} {{state}} {{outcome}} {{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "title": "DLT publications",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (application,topic) (increase(orderflow_kafka_dlt_published_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{application}} {{status}} {{state}} {{outcome}} {{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "title": "Business snapshot age",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "orderflow_metrics_snapshot_age_seconds",
+          "refId": "A",
+          "legendFormat": "{{application}} {{status}} {{state}} {{outcome}} {{topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

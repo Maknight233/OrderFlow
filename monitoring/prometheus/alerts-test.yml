@@ -1,0 +1,82 @@
+rule_files: [alerts.yml]
+evaluation_interval: 5s
+tests:
+  - interval: 5s
+    input_series:
+      - series: 'orderflow_outbox_events{application="order-service",status="FAILED"}'
+        values: '1+0x20'
+      - series: 'orderflow_saga_orders{application="order-service",state="MANUAL_RECOVERY"}'
+        values: '1+0x20'
+      - series: 'orderflow_kafka_dlt_published_total{application="inventory-service",topic="order-events-dlt"}'
+        values: '0 0 1+0x18'
+    alert_rule_test:
+      - eval_time: 5s
+        alertname: OutboxFailed
+        exp_alerts: []
+      - eval_time: 15s
+        alertname: OutboxFailed
+        exp_alerts:
+          - exp_labels: {application: order-service, status: FAILED, severity: critical}
+            exp_annotations: {summary: Outbox events exhausted publishing retries, runbook_url: docs/day10-observability.md}
+      - eval_time: 15s
+        alertname: SagaManualRecovery
+        exp_alerts:
+          - exp_labels: {application: order-service, state: MANUAL_RECOVERY, severity: critical}
+            exp_annotations: {summary: Saga requires operator recovery, runbook_url: docs/day10-observability.md}
+      - eval_time: 15s
+        alertname: DltMessages
+        exp_alerts:
+          - exp_labels: {application: inventory-service, topic: order-events-dlt, severity: warning}
+            exp_annotations: {summary: New messages were published to a dead letter topic, runbook_url: docs/day10-observability.md}
+  - interval: 5s
+    input_series:
+      - series: 'orderflow_outbox_events{status="FAILED"}'
+        values: '0+0x20'
+      - series: 'orderflow_saga_orders{state="MANUAL_RECOVERY"}'
+        values: '0+0x20'
+      - series: 'orderflow_metrics_snapshot_available'
+        values: '1+0x20'
+      - series: 'orderflow_metrics_snapshot_age_seconds'
+        values: '1+0x20'
+    alert_rule_test:
+      - {eval_time: 60s, alertname: OutboxFailed, exp_alerts: []}
+      - {eval_time: 60s, alertname: SagaManualRecovery, exp_alerts: []}
+      - {eval_time: 60s, alertname: BusinessMetricsUnavailable, exp_alerts: []}
+  - interval: 5s
+    input_series:
+      - series: 'up{job="orderflow",application="order-service"}'
+        values: '0+0x20'
+      - series: 'probe_success{job="orderflow-health",application="order-service"}'
+        values: '0+0x20'
+      - series: 'orderflow_outbox_oldest_age_seconds{application="order-service"}'
+        values: '121+0x20'
+      - series: 'orderflow_saga_overdue{application="order-service"}'
+        values: '1+0x20'
+      - series: 'orderflow_metrics_snapshot_available{application="order-service"}'
+        values: '0+0x20'
+    alert_rule_test:
+      - eval_time: 35s
+        alertname: ServiceUnavailable
+        exp_alerts:
+          - exp_labels: {job: orderflow, application: order-service, severity: critical}
+            exp_annotations: {summary: Service metrics endpoint is unavailable, runbook_url: docs/day10-observability.md}
+      - eval_time: 35s
+        alertname: DependencyUnhealthy
+        exp_alerts:
+          - exp_labels: {job: orderflow-health, application: order-service, severity: warning}
+            exp_annotations: {summary: Service dependency health check failed, runbook_url: docs/day10-observability.md}
+      - eval_time: 35s
+        alertname: OutboxBacklog
+        exp_alerts:
+          - exp_labels: {application: order-service, severity: warning}
+            exp_annotations: {summary: Oldest unpublished Outbox event is over two minutes old, runbook_url: docs/day10-observability.md}
+      - eval_time: 35s
+        alertname: SagaOverdue
+        exp_alerts:
+          - exp_labels: {application: order-service, severity: warning}
+            exp_annotations: {summary: Saga step is past its deadline, runbook_url: docs/day10-observability.md}
+      - eval_time: 35s
+        alertname: BusinessMetricsUnavailable
+        exp_alerts:
+          - exp_labels: {application: order-service, severity: warning}
+            exp_annotations: {summary: Business metric snapshot is unavailable or stale, runbook_url: docs/day10-observability.md}

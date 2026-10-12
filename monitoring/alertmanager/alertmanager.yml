@@ -1,0 +1,11 @@
+global:
+  resolve_timeout: 1m
+route:
+  receiver: local
+  group_by: [alertname, application, instance]
+  group_wait: 5s
+  group_interval: 30s
+  repeat_interval: 4h
+receivers:
+  - name: local
+# Alerts are visible in the local UI. Add an authorized notification receiver for deployment.

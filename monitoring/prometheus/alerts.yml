@@ -1,0 +1,67 @@
+groups:
+  - name: orderflow
+    rules:
+      - alert: ServiceUnavailable
+        expr: up{job="orderflow"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: Service metrics endpoint is unavailable
+          runbook_url: docs/day10-observability.md
+      - alert: DependencyUnhealthy
+        expr: probe_success{job="orderflow-health"} == 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: Service dependency health check failed
+          runbook_url: docs/day10-observability.md
+      - alert: OutboxFailed
+        expr: orderflow_outbox_events{status="FAILED"} > 0
+        for: 10s
+        labels:
+          severity: critical
+        annotations:
+          summary: Outbox events exhausted publishing retries
+          runbook_url: docs/day10-observability.md
+      - alert: OutboxBacklog
+        expr: orderflow_outbox_oldest_age_seconds > 120
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: Oldest unpublished Outbox event is over two minutes old
+          runbook_url: docs/day10-observability.md
+      - alert: SagaManualRecovery
+        expr: orderflow_saga_orders{state="MANUAL_RECOVERY"} > 0
+        for: 10s
+        labels:
+          severity: critical
+        annotations:
+          summary: Saga requires operator recovery
+          runbook_url: docs/day10-observability.md
+      - alert: SagaOverdue
+        expr: orderflow_saga_overdue > 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: Saga step is past its deadline
+          runbook_url: docs/day10-observability.md
+      - alert: DltMessages
+        expr: increase(orderflow_kafka_dlt_published_total[5m]) > 0
+        for: 0s
+        labels:
+          severity: warning
+        annotations:
+          summary: New messages were published to a dead letter topic
+          runbook_url: docs/day10-observability.md
+      - alert: BusinessMetricsUnavailable
+        expr: orderflow_metrics_snapshot_available == 0 or orderflow_metrics_snapshot_age_seconds > 30
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: Business metric snapshot is unavailable or stale
+          runbook_url: docs/day10-observability.md
