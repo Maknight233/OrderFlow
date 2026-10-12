@@ -12,7 +12,16 @@ import java.util.Map;
 public class KafkaProducerConfig {
     @Bean
     public KafkaTemplate<String, Object> kafkaTemplate(ProducerFactory<String, Object> producerFactory) {
-        return new KafkaTemplate<>(producerFactory);
+        KafkaTemplate<String, Object> template = new KafkaTemplate<>(producerFactory) {
+            @Override
+            protected String clusterId() {
+                // Producer observations use no synchronous broker metadata lookup.
+                // KafkaAdmin.clusterId() otherwise adds a separate wait before send timeouts apply.
+                return null;
+            }
+        };
+        template.setObservationEnabled(true);
+        return template;
     }
 
     @Bean

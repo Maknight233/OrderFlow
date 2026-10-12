@@ -6,7 +6,9 @@ import com.rom.orderflow.inventory.kafka.event.*;
 import com.rom.orderflow.inventory.outbox.*;
 import com.rom.orderflow.inventory.repository.*;
 import com.rom.orderflow.inventory.service.InventoryService;
+import com.rom.orderflow.inventory.observability.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -15,6 +17,7 @@ import java.util.*;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class InventoryWorkflowTransactions {
     private final InventoryWorkflowLock workflowLock;
     private final InventoryService inventoryService;
@@ -22,6 +25,8 @@ public class InventoryWorkflowTransactions {
     private final ProcessedEventRepository inbox;
     private final OutboxEventRepository outbox;
     private final ObjectMapper objectMapper;
+    private final OutboxTracing tracing;
+    private final BusinessMetrics metrics;
 
     @Transactional
     public void reserve(WorkflowEvent event) {
@@ -135,7 +140,13 @@ public class InventoryWorkflowTransactions {
         WorkflowEvent result = WorkflowEvent.create(command.orderId(), type, null, workflow.getFailureReason());
         outbox.save(OutboxEvent.builder().id(result.eventId()).aggregateType("INVENTORY")
                 .aggregateId(result.orderId()).eventType(type)
-                .payload(objectMapper.writeValueAsString(result)).status(OutboxStatus.PENDING).build());
+                .traceParent(tracing.capture()).payload(objectMapper.writeValueAsString(result)).status(OutboxStatus.PENDING).build());
+        String state = workflow.getState().name();
+        String reason = workflow.getFailureReason();
+        BusinessMetrics.afterCommit(() -> log.atInfo().addKeyValue("orderId", command.orderId())
+                .addKeyValue("eventId", command.eventId()).addKeyValue("resultEventId", result.eventId())
+                .addKeyValue("eventType", command.resolvedType()).addKeyValue("state", state)
+                .addKeyValue("reason", reason).log("Inventory command committed"));
         inbox.save(ProcessedEvent.builder().eventId(command.eventId()).eventType(command.resolvedType())
                 .processedAt(LocalDateTime.now()).build());
     }

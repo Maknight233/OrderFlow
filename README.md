@@ -671,6 +671,11 @@ Day 9 Saga Workflow development (steps 1–9): see [workflow, recovery APIs, and
 Step 10 adds [isolated integration tests and run instructions](integration-tests/README.md).
 See the [latest integration test summary](docs/day9-integration-test-summary.md) for executed scenarios and results.
 
+Day 10 adds health probes, Prometheus metrics, JSON logs, durable HTTP/Kafka tracing,
+Grafana dashboards and recovery alerts. See the [observability runbook](docs/day10-observability.md),
+[executed Day10 summary](docs/day10-observability-summary.md), and
+[verification runner](scripts/run-day10-tests.ps1).
+
 Completed:
 
 ```text
@@ -714,6 +719,17 @@ Retry metadata
 Exponential backoff
 Stale lock recovery
 Multi-instance Outbox testing
+
+Day 9
+Durable order/inventory Saga
+Multi-SKU transactions and compensation
+Isolated end-to-end integration tests
+
+Day 10
+Health probes and Prometheus business metrics
+Structured logs and durable HTTP/Kafka tracing
+Grafana dashboards and recovery alerts
+Observability fault-injection tests
 ```
 
 ---
@@ -724,8 +740,6 @@ Future development will continue toward:
 
 ```text
 Order workflow state management
-Observability and metrics
-Distributed tracing
 Redis caching
 Resilience patterns
 Integration testing

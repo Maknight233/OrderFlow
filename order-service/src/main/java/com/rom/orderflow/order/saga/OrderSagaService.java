@@ -6,6 +6,7 @@ import com.rom.orderflow.order.error.OrderNotFoundException;
 import com.rom.orderflow.order.kafka.event.*;
 import com.rom.orderflow.order.outbox.*;
 import com.rom.orderflow.order.repository.*;
+import com.rom.orderflow.order.observability.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +29,8 @@ public class OrderSagaService {
     private final ProcessedInventoryEventRepository inbox;
     private final OutboxEventRepository outbox;
     private final ObjectMapper objectMapper;
+    private final OutboxTracing tracing;
+    private final BusinessMetrics metrics;
 
     @Value("${orderflow.saga.step-timeout-seconds:120}")
     private long timeoutSeconds;
@@ -96,8 +99,12 @@ public class OrderSagaService {
             default -> throw new IllegalArgumentException("Unsupported inventory event: " + type);
         }
         inbox.save(new ProcessedInventoryEvent(event.eventId(), event.orderId(), type, Instant.now()));
-        log.info("Saga event applied: orderId={}, eventId={}, type={}, state={}",
-                event.orderId(), event.eventId(), type, saga.getState());
+        SagaState committedState = saga.getState();
+        String reason = saga.getFailureReason();
+        BusinessMetrics.afterCommit(() -> log.atInfo().addKeyValue("orderId", event.orderId())
+                .addKeyValue("eventId", event.eventId()).addKeyValue("eventType", type)
+                .addKeyValue("previousState", state).addKeyValue("state", committedState)
+                .addKeyValue("reason", reason).log("Saga event committed"));
     }
 
     @Transactional
@@ -121,9 +128,11 @@ public class OrderSagaService {
         if (saga.terminal() || saga.getState() == SagaState.MANUAL_RECOVERY
                 || saga.getDeadline().isAfter(Instant.now())) return;
         OrderEntity order = order(orderId);
+        BusinessMetrics.afterCommit(metrics::sagaTimeout);
         if (saga.getState() == SagaState.WAITING_RESERVATION) {
             compensate(saga, order, "Inventory reservation timed out");
         } else if (saga.getRetryCount() < maxRetries) {
+            BusinessMetrics.afterCommit(metrics::sagaRetry);
             saga.setRetryCount(saga.getRetryCount() + 1);
             saga.setDeadline(Instant.now().plusSeconds(timeoutSeconds));
             enqueue(command(saga));
@@ -132,6 +141,7 @@ public class OrderSagaService {
         } else {
             saga.setRecoveryState(saga.getState());
             saga.setState(SagaState.MANUAL_RECOVERY);
+            BusinessMetrics.afterCommit(() -> metrics.sagaTransition("COMPENSATING", "MANUAL_RECOVERY", null));
             log.error("Saga requires manual recovery: orderId={}, reason={}", orderId, saga.getFailureReason());
         }
     }
@@ -177,6 +187,16 @@ public class OrderSagaService {
     }
 
     private void transition(OrderSaga saga, SagaState state) {
+        SagaState previous = saga.getState();
+        String reason = saga.getFailureReason();
+        UUID orderId = saga.getOrderId();
+        java.time.Duration duration = state == SagaState.COMPLETED || state == SagaState.CANCELLED
+                ? java.time.Duration.between(order(orderId).getCreatedAt(), Instant.now()) : null;
+        BusinessMetrics.afterCommit(() -> {
+            metrics.sagaTransition(previous == null ? "NEW" : previous.name(), state.name(), duration);
+            log.atInfo().addKeyValue("orderId", orderId).addKeyValue("previousState", previous)
+                    .addKeyValue("state", state).addKeyValue("reason", reason).log("Saga transition committed");
+        });
         saga.setState(state);
         saga.setRecoveryState(null);
         saga.setRetryCount(0);
@@ -208,7 +228,7 @@ public class OrderSagaService {
     private void enqueue(WorkflowEvent event) {
         outbox.save(OutboxEvent.builder().id(event.eventId()).aggregateType("ORDER")
                 .aggregateId(event.orderId()).eventType(event.eventType())
-                .payload(objectMapper.writeValueAsString(event)).status(OutboxStatus.PENDING).build());
+                .traceParent(tracing.capture()).payload(objectMapper.writeValueAsString(event)).status(OutboxStatus.PENDING).build());
     }
 
     private OrderSaga locked(UUID orderId) {

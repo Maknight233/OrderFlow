@@ -24,6 +24,8 @@ public class OutboxEvent {
     private String eventType;
     @Column(nullable = false, columnDefinition = "TEXT")
     private String payload;
+    @Column(length = 255)
+    private String traceParent;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OutboxStatus status;

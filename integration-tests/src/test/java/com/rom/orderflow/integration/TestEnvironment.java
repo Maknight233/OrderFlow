@@ -30,6 +30,7 @@ final class TestEnvironment implements AutoCloseable {
     private final Map<String, Process> services = new HashMap<>();
     private final Map<String, Map<String, String>> serviceOverrides = new HashMap<>();
     private int launchNumber;
+    private final boolean observability = Boolean.getBoolean("orderflow.it.observability");
 
     void prepare() throws Exception {
         Files.createDirectories(logs);
@@ -55,7 +56,20 @@ final class TestEnvironment implements AutoCloseable {
         Path jar = root.resolve(service + "-service/target/" + service + "-service-0.0.1-SNAPSHOT.jar");
         assertTrue(Files.isRegularFile(jar), "Build service jars first: " + jar);
         Map<String, String> properties = new LinkedHashMap<>();
-        properties.put("server.port", service.equals("order") ? "18081" : "18082");
+        properties.put("server.port", Integer.toString(port(service)));
+        properties.put("management.tracing.export.zipkin.enabled", Boolean.toString(observability));
+        properties.put("management.tracing.export.zipkin.endpoint", "http://localhost:19411/api/v2/spans");
+        properties.put("orderflow.observability.snapshot-delay-ms", "500");
+        if (service.equals("gateway")) {
+            properties.put("spring.cloud.gateway.server.webflux.routes[0].id", "order-service");
+            properties.put("spring.cloud.gateway.server.webflux.routes[0].uri", "http://localhost:18081");
+            properties.put("spring.cloud.gateway.server.webflux.routes[0].predicates[0]", "Path=/api/orders/**");
+            properties.put("spring.cloud.gateway.server.webflux.routes[1].id", "inventory-service");
+            properties.put("spring.cloud.gateway.server.webflux.routes[1].uri", "http://localhost:18082");
+            properties.put("spring.cloud.gateway.server.webflux.routes[1].predicates[0]", "Path=/api/inventory/**");
+        }
+        properties.put("spring.datasource.hikari.connection-timeout", "2000");
+        properties.put("spring.datasource.hikari.validation-timeout", "1000");
         properties.put("spring.datasource.url", jdbcUrl(service.equals("order") ? ORDER_DB : INVENTORY_DB));
         properties.put("spring.kafka.bootstrap-servers", BROKER);
         properties.put("spring.kafka.consumer.properties.session.timeout.ms", "6000");
@@ -96,7 +110,7 @@ final class TestEnvironment implements AutoCloseable {
                     .until(() -> {
                         if (!process.isAlive()) throw new AssertionError("Service exited: " + log);
                         try {
-                            return request(service, "GET", "/actuator/health", null).statusCode() == 200;
+                            return request(service, "GET", "/actuator/health/readiness", null).statusCode() == 200;
                         } catch (Exception ignored) {
                             return false;
                         }
@@ -130,9 +144,24 @@ final class TestEnvironment implements AutoCloseable {
     }
 
     HttpResponse<String> request(String service, String method, String path, Object body) throws Exception {
-        int port = service.equals("order") ? 18081 : 18082;
+        return request(service, method, path, body, Map.of());
+    }
+
+    private static int port(String service) {
+        return switch (service) {
+            case "order" -> 18081;
+            case "inventory" -> 18082;
+            case "gateway" -> 19000;
+            default -> throw new IllegalArgumentException("Unknown service " + service);
+        };
+    }
+
+    HttpResponse<String> request(String service, String method, String path, Object body,
+                                 Map<String, String> headers) throws Exception {
+        int port = port(service);
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
                 .timeout(Duration.ofSeconds(10)).header("Content-Type", "application/json");
+        headers.forEach(request::header);
         request.method(method, body == null ? HttpRequest.BodyPublishers.noBody()
                 : HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));
         return http.send(request.build(), HttpResponse.BodyHandlers.ofString());

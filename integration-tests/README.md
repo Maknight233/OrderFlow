@@ -57,3 +57,18 @@ to the dedicated processes and databases.
 The standard service tests currently depend on development infrastructure and
 are excluded from this suite. Gateway/Eureka and multi-broker failover are also
 outside its scope.
+
+## Day10 observability validation
+
+The default Maven suite remains `SagaWorkflowIntegrationTest`. The Day10 runner
+also builds Gateway and starts a separate monitoring stack, then executes the
+observability suite after resetting the disposable business infrastructure:
+
+```powershell
+powershell -File scripts/run-day10-tests.ps1
+```
+
+See [the observability runbook](../docs/day10-observability.md) for metric semantics,
+ports and recovery. Day10 XML reports/check evidence are written to
+`target/day10-reports`; [the Day10 summary](../docs/day10-observability-summary.md)
+is generated from those reports. Day9's original summary is preserved.

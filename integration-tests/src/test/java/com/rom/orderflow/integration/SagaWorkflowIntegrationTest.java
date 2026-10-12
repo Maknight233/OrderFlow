@@ -37,8 +37,8 @@ class SagaWorkflowIntegrationTest {
     @Test
     @Order(1)
     void freshAndLegacyFlywayMigrationsPreserveRecoveryState() throws Exception {
-        assertEquals(4, env.number(ORDER_DB, "SELECT count(*) FROM flyway_schema_history WHERE success"));
-        assertEquals(5, env.number(INVENTORY_DB, "SELECT count(*) FROM flyway_schema_history WHERE success"));
+        assertEquals(5, env.number(ORDER_DB, "SELECT count(*) FROM flyway_schema_history WHERE success"));
+        assertEquals(6, env.number(INVENTORY_DB, "SELECT count(*) FROM flyway_schema_history WHERE success"));
 
         String database = "orderflow_upgrade_it";
         Flyway.configure().dataSource("jdbc:postgresql://localhost:15432/" + database, "orderflow", "orderflow")
