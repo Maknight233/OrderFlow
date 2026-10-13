@@ -58,6 +58,12 @@ visible and alertable. Liveness deliberately excludes external dependencies.
 Gateway probes describe its own process state; they do not guarantee a downstream
 service is reachable.
 
+Day11 adds an optional Redis read cache to Inventory. With the cache enabled,
+Redis failure makes Inventory's overall health DOWN while liveness/readiness
+remain UP and stock operations continue through PostgreSQL. See the
+[Day11 cache notes](day11-redis-cache.md). Day9/Day10 isolated test processes
+disable the cache and Redis health indicator.
+
 ## Metrics and semantics
 
 Labels are bounded: application, status, state, transition, outcome and topic.

@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.rom.orderflow.inventory.workflow.*;
+import com.rom.orderflow.inventory.cache.InventoryReadCache;
 
 import java.util.UUID;
 
@@ -24,6 +25,7 @@ public class InventoryService {
     private final InventoryRepository inventoryRepository;
     private final InventoryReservationRepository reservationRepository;
     private final InventoryWorkflowLock workflowLock;
+    private final InventoryReadCache inventoryReadCache;
 
     @Transactional
     public InventoryResponse createInventory(CreateInventoryRequest request) {
@@ -39,6 +41,7 @@ public class InventoryService {
         inventory.setQuantity(request.quantity());
 
         Inventory saved = inventoryRepository.save(inventory);
+        inventoryReadCache.evictAfterCommit(request.sku());
 
         return toResponse(saved);
     }
@@ -68,6 +71,7 @@ public class InventoryService {
         inventory.setQuantity(request.quantity());
 
         Inventory saved = inventoryRepository.saveAndFlush(inventory);
+        inventoryReadCache.evictAfterCommit(sku);
 
         return toResponse(saved);
     }
@@ -140,6 +144,7 @@ public class InventoryService {
         reservationRepository.save(reservation);
 
         inventoryRepository.saveAndFlush(inventory);
+        inventoryReadCache.evictAfterCommit(inventory.getSku());
 
         return new ReservationResponse(
                 reservation.getId(),
@@ -205,6 +210,7 @@ public class InventoryService {
         reservation.setStatus(ReservationStatus.CONFIRMED);
 
         inventoryRepository.saveAndFlush(inventory);
+        inventoryReadCache.evictAfterCommit(sku);
         reservationRepository.save(reservation);
 
         return toReservationResponse(reservation);
@@ -255,6 +261,7 @@ public class InventoryService {
         reservation.setStatus(ReservationStatus.RELEASED);
 
         inventoryRepository.saveAndFlush(inventory);
+        inventoryReadCache.evictAfterCommit(sku);
         reservationRepository.save(reservation);
 
         return toReservationResponse(reservation);

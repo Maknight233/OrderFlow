@@ -60,6 +60,9 @@ final class TestEnvironment implements AutoCloseable {
         properties.put("management.tracing.export.zipkin.enabled", Boolean.toString(observability));
         properties.put("management.tracing.export.zipkin.endpoint", "http://localhost:19411/api/v2/spans");
         properties.put("orderflow.observability.snapshot-delay-ms", "500");
+        // Day9/Day10 suites use only their disposable PostgreSQL/Kafka infrastructure.
+        properties.put("orderflow.cache.inventory.enabled", "false");
+        properties.put("management.health.redis.enabled", "false");
         if (service.equals("gateway")) {
             properties.put("spring.cloud.gateway.server.webflux.routes[0].id", "order-service");
             properties.put("spring.cloud.gateway.server.webflux.routes[0].uri", "http://localhost:18081");

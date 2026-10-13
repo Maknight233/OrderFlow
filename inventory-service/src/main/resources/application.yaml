@@ -4,6 +4,14 @@ server:
 spring:
   application:
     name: inventory-service
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      connect-timeout: 300ms
+      timeout: 300ms
+      repositories:
+        enabled: false
   datasource:
     url: jdbc:postgresql://localhost:5432/inventory_db
     username: orderflow
@@ -48,6 +56,10 @@ eureka:
 
 
 orderflow:
+  cache:
+    inventory:
+      enabled: ${INVENTORY_CACHE_ENABLED:true}
+      ttl: ${INVENTORY_CACHE_TTL:5s}
   outbox:
     batch-size: 10
     publish-delay-ms: 2000
@@ -55,6 +67,9 @@ orderflow:
     max-attempts: 5
 
 management:
+  health:
+    redis:
+      enabled: ${INVENTORY_CACHE_ENABLED:true}
   endpoints:
     web:
       exposure:

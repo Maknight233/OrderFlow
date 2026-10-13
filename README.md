@@ -676,6 +676,11 @@ Grafana dashboards and recovery alerts. See the [observability runbook](docs/day
 [executed Day10 summary](docs/day10-observability-summary.md), and
 [verification runner](scripts/run-day10-tests.ps1).
 
+Day 11 has started with an optional Redis inventory HTTP read cache, expiration,
+after-commit invalidation and database fallback. See the
+[Day11 scope, consistency limits and validation](docs/day11-redis-cache.md).
+Run `powershell -File scripts/run-day11-tests.ps1` for isolated cache checks.
+
 Completed:
 
 ```text

@@ -2,6 +2,7 @@ package com.rom.orderflow.inventory.controller;
 
 import com.rom.orderflow.inventory.dto.*;
 import com.rom.orderflow.inventory.service.InventoryService;
+import com.rom.orderflow.inventory.cache.InventoryReadCache;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -15,6 +16,7 @@ import java.util.UUID;
 public class InventoryController {
 
     private final InventoryService inventoryService;
+    private final InventoryReadCache inventoryReadCache;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -28,7 +30,7 @@ public class InventoryController {
     public InventoryResponse getInventory(
             @PathVariable String sku
     ) {
-        return inventoryService.getInventory(sku);
+        return inventoryReadCache.get(sku, () -> inventoryService.getInventory(sku));
     }
 
     @PutMapping("/{sku}")
