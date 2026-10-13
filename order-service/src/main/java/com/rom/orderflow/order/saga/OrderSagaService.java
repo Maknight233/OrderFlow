@@ -7,6 +7,7 @@ import com.rom.orderflow.order.kafka.event.*;
 import com.rom.orderflow.order.outbox.*;
 import com.rom.orderflow.order.repository.*;
 import com.rom.orderflow.order.observability.*;
+import com.rom.orderflow.order.cache.OrderReadCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,6 +32,7 @@ public class OrderSagaService {
     private final ObjectMapper objectMapper;
     private final OutboxTracing tracing;
     private final BusinessMetrics metrics;
+    private final OrderReadCache orderReadCache;
 
     @Value("${orderflow.saga.step-timeout-seconds:120}")
     private long timeoutSeconds;
@@ -187,6 +189,7 @@ public class OrderSagaService {
     }
 
     private void transition(OrderSaga saga, SagaState state) {
+        orderReadCache.evictAfterCommit(saga.getOrderId());
         SagaState previous = saga.getState();
         String reason = saga.getFailureReason();
         UUID orderId = saga.getOrderId();

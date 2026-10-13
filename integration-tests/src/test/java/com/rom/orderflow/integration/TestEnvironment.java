@@ -62,7 +62,15 @@ final class TestEnvironment implements AutoCloseable {
         properties.put("orderflow.observability.snapshot-delay-ms", "500");
         // Day9/Day10 suites use only their disposable PostgreSQL/Kafka infrastructure.
         properties.put("orderflow.cache.inventory.enabled", "false");
+        properties.put("orderflow.cache.order.enabled", "false");
         properties.put("management.health.redis.enabled", "false");
+        if (Boolean.getBoolean("orderflow.it.redis")) {
+            properties.put("orderflow.cache.inventory.enabled", "true");
+            properties.put("orderflow.cache.order.enabled", "true");
+            properties.put("management.health.redis.enabled", "true");
+            properties.put("spring.data.redis.host", "localhost");
+            properties.put("spring.data.redis.port", "16379");
+        }
         if (service.equals("gateway")) {
             properties.put("spring.cloud.gateway.server.webflux.routes[0].id", "order-service");
             properties.put("spring.cloud.gateway.server.webflux.routes[0].uri", "http://localhost:18081");

@@ -1,10 +1,14 @@
 """Generate a summary from the actual Surefire XML report."""
 from datetime import datetime
 from pathlib import Path
+import argparse
 import xml.etree.ElementTree as ET
 
 root = Path(__file__).resolve().parents[1]
-report = root / "integration-tests/target/surefire-reports/TEST-com.rom.orderflow.integration.SagaWorkflowIntegrationTest.xml"
+parser = argparse.ArgumentParser()
+parser.add_argument("--report", type=Path, default=root / "integration-tests/target/surefire-reports/TEST-com.rom.orderflow.integration.SagaWorkflowIntegrationTest.xml")
+report = parser.parse_args().report.resolve()
+report_label = report.relative_to(root).as_posix()
 suite = ET.parse(report).getroot()
 cases = suite.findall("testcase")
 failures = int(suite.get("failures", "0"))
@@ -71,8 +75,8 @@ lines += [
     "  are outside this suite. Existing service tests tied to development databases",
     "  are not included in these counts.", "",
     "## Artifacts and reproduction", "",
-    "- XML: integration-tests/target/surefire-reports/TEST-com.rom.orderflow.integration.SagaWorkflowIntegrationTest.xml",
-    "- Text report: integration-tests/target/surefire-reports/com.rom.orderflow.integration.SagaWorkflowIntegrationTest.txt",
+    f"- XML: {report_label}",
+    f"- Text report: {report.parent.relative_to(root).as_posix()}/com.rom.orderflow.integration.SagaWorkflowIntegrationTest.txt",
     "- Service logs: integration-tests/target/service-logs/",
     "- Run: powershell -File scripts/run-integration-tests.ps1",
     "- If needed, pass -MavenRepository C:/Users/marj-/.m2/repository.",

@@ -81,6 +81,8 @@ lines += [
     "- Monitoring images: Prometheus 3.2.1, Grafana 11.6.0, Zipkin 3.5.1, Alertmanager 0.28.1, Blackbox 0.26.0.",
     "- Dedicated business project orderflow-it uses PostgreSQL 15432 and Kafka 19092; services use 18081/18082.",
     "  Day10 Gateway uses 19000 with direct test routes. Eureka registration/load balancing is not exercised.",
+    "- Day9/Day10 processes explicitly disable Order/Inventory Redis caches and Redis health checks;",
+    "  Redis HTTP/Kafka failure and invalidation behavior is validated separately by the Day11 suite.",
     "- Dedicated monitoring project orderflow-day10 uses Prometheus 19090, Grafana 13000, Zipkin 19411,",
     "  Alertmanager 19093 and Blackbox 19115. Development databases and containers are not reset.",
     "- Broker/database outages stop and restart dedicated containers; crash verification kills the dedicated order JVM.",
@@ -103,7 +105,7 @@ lines += [
     "- Service logs: `integration-tests/target/service-logs/run-*/`.",
     "- Regenerate this summary: `python scripts/summarize-day10.py`.",
     "- Runbook: [Day10 observability](day10-observability.md).",
-    "- Day9's original summary remains [available](day9-integration-test-summary.md).", "",
+    "- Day9's separate summary remains [available](day9-integration-test-summary.md).", "",
 ]
 output = root / "docs/day10-observability-summary.md"
 output.write_text("\n".join(lines), encoding="utf-8")

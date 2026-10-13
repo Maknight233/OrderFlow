@@ -72,3 +72,24 @@ See [the observability runbook](../docs/day10-observability.md) for metric seman
 ports and recovery. Day10 XML reports/check evidence are written to
 `target/day10-reports`; [the Day10 summary](../docs/day10-observability-summary.md)
 is generated from those reports. Day9's original summary is preserved.
+
+Pass `-RefreshDay9Summary` to refresh the separate Day9 summary from this run.
+The runner executes Day9 regression before Day10 observability, resetting the
+business infrastructure between suites. Both caches and Redis health checks
+are explicitly disabled in these regression processes.
+
+## Day11 Redis cache validation
+
+```powershell
+powershell -File scripts/run-day11-tests.ps1
+powershell -File scripts/run-day10-tests.ps1 -RefreshDay9Summary
+python scripts/summarize-day11.py
+```
+
+The Day11 runner adds a dedicated Redis container on port 16379 and runs 27
+cache tests plus nine real Gateway HTTP/PostgreSQL/Kafka/Redis scenarios.
+The production order TTL is 45 seconds; inventory TTL is five seconds.
+Reports/check evidence are saved to `target/day11-reports`; service logs and
+trace/alert evidence remain in `target/service-logs`. Dedicated test containers
+are removed afterward. See the [Day11 runbook](../docs/day11-redis-cache.md) and
+[final summary](../docs/day11-redis-cache-summary.md) for coverage and consistency limits.

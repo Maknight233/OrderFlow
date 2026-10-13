@@ -1,10 +1,10 @@
 # Day 9 integration test summary
 
-Generated: 2026-10-09T17:24:14-04:00
+Generated: 2026-10-13T19:04:41-04:00
 Suite timestamp: not recorded
 
 Result: **20/20 passed**, failures: 0, errors: 0, skipped: 0.
-Suite elapsed time: **673.572 seconds** (includes service startup and restart).
+Suite elapsed time: **835.422 seconds** (includes service startup and restart).
 
 Environment: Java 21, Spring Boot 4.1.1, PostgreSQL 16, Kafka 4.2.1.
 Two real packaged service processes; real HTTP, JDBC, Kafka and Flyway. No business mocks.
@@ -13,26 +13,26 @@ Development containers and databases were not used for these tests.
 
 | Scenario | Result | Seconds |
 |---|---|---:|
-| freshAndLegacyFlywayMigrationsPreserveRecoveryState | PASS | 2.653 |
-| multiSkuOrderCompletesAndMergesRepeatedSkus | PASS | 3.476 |
-| failedMultiSkuReservationRollsBackAllStockAndCancels(String)[1] | PASS | 1.350 |
-| failedMultiSkuReservationRollsBackAllStockAndCancels(String)[2] | PASS | 1.446 |
-| duplicateCommandsAndResultsHaveOneBusinessEffect | PASS | 3.801 |
-| releaseBeforeReserveAndLateResultsCannotReopenCancelledOrder | PASS | 69.652 |
-| releaseFirstRestoresReservedStockOnlyOnce | PASS | 66.461 |
-| confirmationFirstWinsRacingCancellation | PASS | 100.230 |
-| concurrentOrdersCannotOversellLastItem | PASS | 1.530 |
-| inventoryOutboxFailureKeepsAtomicResultAndRecoversAfterRestart | PASS | 84.802 |
-| brokerOutageRetainsOrderAndPublishesAutomaticallyAfterRecovery | PASS | 20.692 |
-| databaseFailureRollsBackStockInboxAndOutboxThenReplaysFromDlt | PASS | 6.770 |
-| poisonMessagesReachBothDltsWithoutBlockingValidOrders | PASS | 8.253 |
-| reservationTimeoutAndExhaustedCompensationSupportManualRecovery | PASS | 34.066 |
-| crashAfterOutboxClaimRecoversAndFailedCommandsCanBeRetried | PASS | 134.644 |
-| postgresSkipLockedAllowsTwoWorkersToClaimDifferentEvents | PASS | 60.325 |
-| invalidOrdersReturnBadRequestWithoutPersistingBusinessState | PASS | 0.509 |
-| legacyOrderPayloadPublishesThroughOutbox | PASS | 3.032 |
-| legacyInventoryResultIsAccepted(String)[1] | PASS | 0.788 |
-| legacyInventoryResultIsAccepted(String)[2] | PASS | 0.759 |
+| freshAndLegacyFlywayMigrationsPreserveRecoveryState | PASS | 4.249 |
+| multiSkuOrderCompletesAndMergesRepeatedSkus | PASS | 5.323 |
+| failedMultiSkuReservationRollsBackAllStockAndCancels(String)[1] | PASS | 1.589 |
+| failedMultiSkuReservationRollsBackAllStockAndCancels(String)[2] | PASS | 1.261 |
+| duplicateCommandsAndResultsHaveOneBusinessEffect | PASS | 2.926 |
+| releaseBeforeReserveAndLateResultsCannotReopenCancelledOrder | PASS | 85.144 |
+| releaseFirstRestoresReservedStockOnlyOnce | PASS | 85.285 |
+| confirmationFirstWinsRacingCancellation | PASS | 127.323 |
+| concurrentOrdersCannotOversellLastItem | PASS | 1.571 |
+| inventoryOutboxFailureKeepsAtomicResultAndRecoversAfterRestart | PASS | 105.805 |
+| brokerOutageRetainsOrderAndPublishesAutomaticallyAfterRecovery | PASS | 20.992 |
+| databaseFailureRollsBackStockInboxAndOutboxThenReplaysFromDlt | PASS | 6.394 |
+| poisonMessagesReachBothDltsWithoutBlockingValidOrders | PASS | 9.088 |
+| reservationTimeoutAndExhaustedCompensationSupportManualRecovery | PASS | 46.946 |
+| crashAfterOutboxClaimRecoversAndFailedCommandsCanBeRetried | PASS | 163.503 |
+| postgresSkipLockedAllowsTwoWorkersToClaimDifferentEvents | PASS | 79.174 |
+| invalidOrdersReturnBadRequestWithoutPersistingBusinessState | PASS | 1.666 |
+| legacyOrderPayloadPublishesThroughOutbox | PASS | 2.599 |
+| legacyInventoryResultIsAccepted(String)[1] | PASS | 0.953 |
+| legacyInventoryResultIsAccepted(String)[2] | PASS | 0.873 |
 
 ## Runtime defect found and fixed
 
@@ -68,8 +68,8 @@ three additional regression cases cover old order and inventory payloads.
 
 ## Artifacts and reproduction
 
-- XML: integration-tests/target/surefire-reports/TEST-com.rom.orderflow.integration.SagaWorkflowIntegrationTest.xml
-- Text report: integration-tests/target/surefire-reports/com.rom.orderflow.integration.SagaWorkflowIntegrationTest.txt
+- XML: integration-tests/target/day10-reports/TEST-com.rom.orderflow.integration.SagaWorkflowIntegrationTest.xml
+- Text report: integration-tests/target/day10-reports/com.rom.orderflow.integration.SagaWorkflowIntegrationTest.txt
 - Service logs: integration-tests/target/service-logs/
 - Run: powershell -File scripts/run-integration-tests.ps1
 - If needed, pass -MavenRepository C:/Users/marj-/.m2/repository.

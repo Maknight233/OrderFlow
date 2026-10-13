@@ -676,10 +676,13 @@ Grafana dashboards and recovery alerts. See the [observability runbook](docs/day
 [executed Day10 summary](docs/day10-observability-summary.md), and
 [verification runner](scripts/run-day10-tests.ps1).
 
-Day 11 has started with an optional Redis inventory HTTP read cache, expiration,
-after-commit invalidation and database fallback. See the
-[Day11 scope, consistency limits and validation](docs/day11-redis-cache.md).
-Run `powershell -File scripts/run-day11-tests.ps1` for isolated cache checks.
+Day 11 adds Redis order and inventory HTTP read caches (45s/5s TTL), Saga and
+stock invalidation after commit, and database fallback during Redis failure.
+All 65 cache/end-to-end/Day9/Day10 regression checks passed. See the
+[Day11 runbook and consistency limits](docs/day11-redis-cache.md) and
+[final test summary](docs/day11-redis-cache-summary.md).
+Run `powershell -File scripts/run-day11-tests.ps1` for isolated cache checks;
+the runbook lists the subsequent regression and summary commands.
 
 Completed:
 
@@ -735,6 +738,11 @@ Health probes and Prometheus business metrics
 Structured logs and durable HTTP/Kafka tracing
 Grafana dashboards and recovery alerts
 Observability fault-injection tests
+
+Day 11
+Redis order and inventory read caches (45s/5s TTL)
+After-commit invalidation and Redis failure fallback
+HTTP/Kafka/Redis tests and Day9/Day10 regression
 ```
 
 ---
@@ -745,7 +753,7 @@ Future development will continue toward:
 
 ```text
 Order workflow state management
-Redis caching
+Cache consistency and load testing
 Resilience patterns
 Integration testing
 Containerization

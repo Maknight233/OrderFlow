@@ -1,6 +1,7 @@
 param(
     [string]$MavenRepository,
-    [switch]$KeepInfrastructure
+    [switch]$KeepInfrastructure,
+    [switch]$RefreshDay9Summary
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,7 +14,7 @@ $savedEnvironment = @{}
 foreach ($name in $environmentNames) { $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
 Push-Location -LiteralPath $projectRoot
 try {
-    & mvn @mavenOptions -pl order-service,inventory-service,gateway-service -am -DskipTests package
+    & mvn -B -ntp @mavenOptions -pl order-service,inventory-service,gateway-service -am -DskipTests package
     if ($LASTEXITCODE -ne 0) { throw 'Service build failed.' }
     New-Item -ItemType Directory -Force -Path $reportRoot | Out-Null
     $evidencePath = Join-Path $reportRoot 'checks.json'
@@ -39,15 +40,19 @@ try {
     & docker exec -w /etc/prometheus orderflow-day10-prometheus-1 promtool test rules alerts-test.yml
     if ($LASTEXITCODE -ne 0) { throw 'Prometheus alert rule tests failed.' }
 
-    foreach ($suite in @('ObservabilityIntegrationTest','SagaWorkflowIntegrationTest')) {
+    foreach ($suite in @('SagaWorkflowIntegrationTest','ObservabilityIntegrationTest')) {
         # Reset only the dedicated Day9/Day10 test project between suites.
         & docker compose -f docker-compose.integration.yml -p orderflow-it down --volumes --remove-orphans
         if ($LASTEXITCODE -ne 0) { throw 'Could not reset test infrastructure.' }
         & docker compose -f docker-compose.integration.yml -p orderflow-it up -d --wait --wait-timeout 120
         if ($LASTEXITCODE -ne 0) { throw 'Test infrastructure did not become healthy.' }
         $tracing = ($suite -eq 'ObservabilityIntegrationTest').ToString().ToLowerInvariant()
-        & mvn @mavenOptions -f integration-tests/pom.xml "-Dtest=$suite" "-Dorderflow.it.observability=$tracing" "-Dorderflow.it.reportsDirectory=$reportRoot" test
+        & mvn -B -ntp @mavenOptions -f integration-tests/pom.xml "-Dtest=$suite" "-Dorderflow.it.observability=$tracing" "-Dorderflow.it.reportsDirectory=$reportRoot" test
         if ($LASTEXITCODE -ne 0) { throw "$suite failed; see $reportRoot" }
+        if ($RefreshDay9Summary -and $suite -eq 'SagaWorkflowIntegrationTest') {
+            & python scripts/summarize-integration-tests.py --report (Join-Path $reportRoot 'TEST-com.rom.orderflow.integration.SagaWorkflowIntegrationTest.xml')
+            if ($LASTEXITCODE -ne 0) { throw 'Could not refresh the Day9 summary.' }
+        }
     }
     @{
         generatedAt = (Get-Date).ToUniversalTime().ToString('o')

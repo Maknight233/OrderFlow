@@ -4,6 +4,14 @@ server:
 spring:
   application:
     name: order-service
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      connect-timeout: 300ms
+      timeout: 300ms
+      repositories:
+        enabled: false
   datasource:
     url: jdbc:postgresql://localhost:5432/orderflow
     username: orderflow
@@ -48,6 +56,10 @@ eureka:
 
 
 orderflow:
+  cache:
+    order:
+      enabled: ${ORDER_CACHE_ENABLED:true}
+      ttl: ${ORDER_CACHE_TTL:45s}
   outbox:
     batch-size: 10
     publish-delay-ms: 2000
@@ -59,6 +71,9 @@ orderflow:
     max-retries: 5
 
 management:
+  health:
+    redis:
+      enabled: ${ORDER_CACHE_ENABLED:true}
   endpoints:
     web:
       exposure:

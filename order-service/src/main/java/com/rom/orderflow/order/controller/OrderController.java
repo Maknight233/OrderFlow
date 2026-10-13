@@ -2,7 +2,7 @@ package com.rom.orderflow.order.controller;
 
 import com.rom.orderflow.order.dto.CreateOrderRequest;
 import com.rom.orderflow.order.dto.OrderResponse;
-import com.rom.orderflow.order.domain.OrderEntity;
+import com.rom.orderflow.order.cache.OrderReadCache;
 import com.rom.orderflow.order.service.OrderApplicationService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,9 +16,11 @@ import java.util.UUID;
 public class OrderController {
 
     private final OrderApplicationService orderApplicationService;
+    private final OrderReadCache orderReadCache;
 
-    public OrderController(OrderApplicationService orderApplicationService) {
+    public OrderController(OrderApplicationService orderApplicationService, OrderReadCache orderReadCache) {
         this.orderApplicationService = orderApplicationService;
+        this.orderReadCache = orderReadCache;
     }
 
     @PostMapping
@@ -37,7 +39,7 @@ public class OrderController {
             @PathVariable UUID id) {
 
         return ResponseEntity.ok(
-                orderApplicationService.getOrderById(id)
+                orderReadCache.get(id, () -> orderApplicationService.getOrderById(id))
         );
     }
 }
