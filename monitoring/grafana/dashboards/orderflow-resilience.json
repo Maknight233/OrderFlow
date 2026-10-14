@@ -1,0 +1,185 @@
+{
+  "uid": "orderflow-resilience",
+  "title": "OrderFlow Gateway resilience",
+  "schemaVersion": 40,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "tags": [
+    "orderflow",
+    "day12"
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Circuit states",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "resilience4j_circuitbreaker_state{application=\"gateway-service\"}",
+          "refId": "A",
+          "legendFormat": "{{name}} {{route}} {{state}} {{method}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "Circuit failure rate",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "resilience4j_circuitbreaker_failure_rate{application=\"gateway-service\"}",
+          "refId": "A",
+          "legendFormat": "{{name}} {{route}} {{state}} {{method}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Gateway retries",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(orderflow_gateway_retries_total[5m])",
+          "refId": "A",
+          "legendFormat": "{{name}} {{route}} {{state}} {{method}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Gateway timeouts",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(orderflow_gateway_timeouts_total[5m])",
+          "refId": "A",
+          "legendFormat": "{{name}} {{route}} {{state}} {{method}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "title": "Concurrency rejections",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(orderflow_gateway_rejected_total[5m])",
+          "refId": "A",
+          "legendFormat": "{{name}} {{route}} {{state}} {{method}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "Available concurrency permits",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "orderflow-prometheus"
+      },
+      "targets": [
+        {
+          "expr": "orderflow_gateway_concurrent_available",
+          "refId": "A",
+          "legendFormat": "{{name}} {{route}} {{state}} {{method}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

@@ -1,8 +1,8 @@
 # Day 11 final test summary
 
-Generated: 2026-10-13T19:13:35-04:00
-Day11 validation completed: 2026-10-13T22:49:04.8117848Z
-Day9/Day10 regression completed: 2026-10-13T23:11:15.4708428Z
+Generated: 2026-10-14T16:58:50-04:00
+Day11 validation completed: 2026-10-14T20:34:59.3633700Z
+Day9/Day10 regression completed: 2026-10-14T20:58:42.7270126Z
 
 Result: **65/65 passed**, failures: 0, errors: 0, skipped: 0.
 
@@ -21,27 +21,27 @@ Prometheus alert rule tests: **PASS**.
 
 | Suite | Passed | Seconds |
 |---|---:|---:|
-| Order cache unit/configuration | 10/10 | 15.974 |
-| Inventory cache unit/configuration | 10/10 | 8.380 |
-| Inventory mutation wiring | 6/6 | 3.479 |
-| Real Redis cache | 1/1 | 4.919 |
-| HTTP/Kafka/Redis end-to-end | 9/9 | 403.488 |
-| Day9 regression | 20/20 | 835.422 |
-| Day10 regression | 9/9 | 361.390 |
+| Order cache unit/configuration | 10/10 | 9.487 |
+| Inventory cache unit/configuration | 10/10 | 7.485 |
+| Inventory mutation wiring | 6/6 | 3.519 |
+| Real Redis cache | 1/1 | 5.574 |
+| HTTP/Kafka/Redis end-to-end | 9/9 | 388.691 |
+| Day9 regression | 20/20 | 882.028 |
+| Day10 regression | 9/9 | 422.227 |
 
 ## End-to-end scenarios
 
 | Scenario | Result | Seconds |
 |---|---|---:|
-| gatewayReadsCacheWith45SecondTtlAndDoesNotCache404 | PASS | 46.626 |
-| kafkaCommitInvalidatesPendingOrderAndInventoryCaches | PASS | 48.253 |
-| httpCancellationAndKafkaReleaseInvalidateEachCommittedStatus | PASS | 41.215 |
-| rolledBackSagaPreservesCacheThenReplayInvalidatesIt | PASS | 41.589 |
-| corruptOrWrongOrderPayloadFallsBackToPostgres | PASS | 1.775 |
-| actual45SecondExpirationReloadsAndRefreshesTtl | PASS | 46.809 |
-| redisOutageAllowsReadsAndKafkaSagaThenRecovers | PASS | 7.088 |
-| inventoryHttpUpdateAndShortTtlRemainUsable | PASS | 0.166 |
-| scheduledTimeoutInvalidatesPendingCacheBeforeCompensationCompletes | PASS | 46.784 |
+| gatewayReadsCacheWith45SecondTtlAndDoesNotCache404 | PASS | 52.551 |
+| kafkaCommitInvalidatesPendingOrderAndInventoryCaches | PASS | 42.677 |
+| httpCancellationAndKafkaReleaseInvalidateEachCommittedStatus | PASS | 42.157 |
+| rolledBackSagaPreservesCacheThenReplayInvalidatesIt | PASS | 47.682 |
+| corruptOrWrongOrderPayloadFallsBackToPostgres | PASS | 1.013 |
+| actual45SecondExpirationReloadsAndRefreshesTtl | PASS | 46.351 |
+| redisOutageAllowsReadsAndKafkaSagaThenRecovers | PASS | 7.115 |
+| inventoryHttpUpdateAndShortTtlRemainUsable | PASS | 0.136 |
+| scheduledTimeoutInvalidatesPendingCacheBeforeCompensationCompletes | PASS | 39.043 |
 
 ## Environment and evidence
 

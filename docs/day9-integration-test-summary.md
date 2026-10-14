@@ -1,10 +1,10 @@
 # Day 9 integration test summary
 
-Generated: 2026-10-13T19:04:41-04:00
+Generated: 2026-10-14T16:51:03-04:00
 Suite timestamp: not recorded
 
 Result: **20/20 passed**, failures: 0, errors: 0, skipped: 0.
-Suite elapsed time: **835.422 seconds** (includes service startup and restart).
+Suite elapsed time: **882.028 seconds** (includes service startup and restart).
 
 Environment: Java 21, Spring Boot 4.1.1, PostgreSQL 16, Kafka 4.2.1.
 Two real packaged service processes; real HTTP, JDBC, Kafka and Flyway. No business mocks.
@@ -13,26 +13,26 @@ Development containers and databases were not used for these tests.
 
 | Scenario | Result | Seconds |
 |---|---|---:|
-| freshAndLegacyFlywayMigrationsPreserveRecoveryState | PASS | 4.249 |
-| multiSkuOrderCompletesAndMergesRepeatedSkus | PASS | 5.323 |
-| failedMultiSkuReservationRollsBackAllStockAndCancels(String)[1] | PASS | 1.589 |
-| failedMultiSkuReservationRollsBackAllStockAndCancels(String)[2] | PASS | 1.261 |
-| duplicateCommandsAndResultsHaveOneBusinessEffect | PASS | 2.926 |
-| releaseBeforeReserveAndLateResultsCannotReopenCancelledOrder | PASS | 85.144 |
-| releaseFirstRestoresReservedStockOnlyOnce | PASS | 85.285 |
-| confirmationFirstWinsRacingCancellation | PASS | 127.323 |
-| concurrentOrdersCannotOversellLastItem | PASS | 1.571 |
-| inventoryOutboxFailureKeepsAtomicResultAndRecoversAfterRestart | PASS | 105.805 |
-| brokerOutageRetainsOrderAndPublishesAutomaticallyAfterRecovery | PASS | 20.992 |
-| databaseFailureRollsBackStockInboxAndOutboxThenReplaysFromDlt | PASS | 6.394 |
-| poisonMessagesReachBothDltsWithoutBlockingValidOrders | PASS | 9.088 |
-| reservationTimeoutAndExhaustedCompensationSupportManualRecovery | PASS | 46.946 |
-| crashAfterOutboxClaimRecoversAndFailedCommandsCanBeRetried | PASS | 163.503 |
-| postgresSkipLockedAllowsTwoWorkersToClaimDifferentEvents | PASS | 79.174 |
-| invalidOrdersReturnBadRequestWithoutPersistingBusinessState | PASS | 1.666 |
-| legacyOrderPayloadPublishesThroughOutbox | PASS | 2.599 |
-| legacyInventoryResultIsAccepted(String)[1] | PASS | 0.953 |
-| legacyInventoryResultIsAccepted(String)[2] | PASS | 0.873 |
+| freshAndLegacyFlywayMigrationsPreserveRecoveryState | PASS | 4.503 |
+| multiSkuOrderCompletesAndMergesRepeatedSkus | PASS | 5.097 |
+| failedMultiSkuReservationRollsBackAllStockAndCancels(String)[1] | PASS | 1.317 |
+| failedMultiSkuReservationRollsBackAllStockAndCancels(String)[2] | PASS | 1.201 |
+| duplicateCommandsAndResultsHaveOneBusinessEffect | PASS | 3.183 |
+| releaseBeforeReserveAndLateResultsCannotReopenCancelledOrder | PASS | 87.702 |
+| releaseFirstRestoresReservedStockOnlyOnce | PASS | 89.222 |
+| confirmationFirstWinsRacingCancellation | PASS | 129.819 |
+| concurrentOrdersCannotOversellLastItem | PASS | 1.506 |
+| inventoryOutboxFailureKeepsAtomicResultAndRecoversAfterRestart | PASS | 106.170 |
+| brokerOutageRetainsOrderAndPublishesAutomaticallyAfterRecovery | PASS | 22.662 |
+| databaseFailureRollsBackStockInboxAndOutboxThenReplaysFromDlt | PASS | 6.341 |
+| poisonMessagesReachBothDltsWithoutBlockingValidOrders | PASS | 8.871 |
+| reservationTimeoutAndExhaustedCompensationSupportManualRecovery | PASS | 48.340 |
+| crashAfterOutboxClaimRecoversAndFailedCommandsCanBeRetried | PASS | 181.911 |
+| postgresSkipLockedAllowsTwoWorkersToClaimDifferentEvents | PASS | 83.445 |
+| invalidOrdersReturnBadRequestWithoutPersistingBusinessState | PASS | 0.988 |
+| legacyOrderPayloadPublishesThroughOutbox | PASS | 3.121 |
+| legacyInventoryResultIsAccepted(String)[1] | PASS | 0.501 |
+| legacyInventoryResultIsAccepted(String)[2] | PASS | 0.461 |
 
 ## Runtime defect found and fixed
 

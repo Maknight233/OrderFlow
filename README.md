@@ -74,6 +74,7 @@ The project is designed to demonstrate production-oriented microservice patterns
 - Spring Boot 4.1.1
 - Spring Cloud
 - Spring Data JPA
+- Resilience4j (reactive Gateway circuit breakers)
 - Hibernate
 - Bean Validation
 - Maven
@@ -684,6 +685,16 @@ All 65 cache/end-to-end/Day9/Day10 regression checks passed. See the
 Run `powershell -File scripts/run-day11-tests.ps1` for isolated cache checks;
 the runbook lists the subsequent regression and summary commands.
 
+Day 12 adds separate Order/Inventory HTTP circuit breakers, bounded connection/
+response timeouts, GET-only retries, standard 503/504 fallback and per-route
+concurrency protection. Kafka/Saga recovery remains independent; POST is never
+automatically retried, including connection resets. See the
+[Day12 runbook](docs/day12-resilience.md) and
+[executed test summary](docs/day12-resilience-summary.md): **79/79 checks passed**,
+including all Day9-Day11 regressions and live Grafana dashboard validation.
+Run `powershell -File scripts/run-day12-tests.ps1 -RunRegressions` to reproduce.
+Rate limiting remains optional and deferred.
+
 Completed:
 
 ```text
@@ -743,6 +754,12 @@ Day 11
 Redis order and inventory read caches (45s/5s TTL)
 After-commit invalidation and Redis failure fallback
 HTTP/Kafka/Redis tests and Day9/Day10 regression
+
+Day 12
+Reactive Gateway circuit breakers and bounded HTTP timeouts
+GET-only retries, standard fallback and concurrency protection
+Resilience metrics/dashboard and fault-injection Saga consistency tests
+Day9-Day11 regression
 ```
 
 ---
@@ -754,7 +771,7 @@ Future development will continue toward:
 ```text
 Order workflow state management
 Cache consistency and load testing
-Resilience patterns
+Distributed rate limiting
 Integration testing
 Containerization
 Kubernetes deployment

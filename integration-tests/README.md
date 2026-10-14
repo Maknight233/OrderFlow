@@ -93,3 +93,20 @@ Reports/check evidence are saved to `target/day11-reports`; service logs and
 trace/alert evidence remain in `target/service-logs`. Dedicated test containers
 are removed afterward. See the [Day11 runbook](../docs/day11-redis-cache.md) and
 [final summary](../docs/day11-redis-cache-summary.md) for coverage and consistency limits.
+
+## Day12 Gateway resilience validation
+
+```powershell
+powershell -File scripts/run-day12-tests.ps1 -RunRegressions
+```
+
+This adds three concurrency unit tests, seven packaged-Gateway HTTP fault
+scenarios and four real Saga/fault-proxy scenarios, then executes all Day11
+cache tests and Day9/Day10 regressions. HTTP fixtures use 18084/18085;
+Gateway uses 19000. Suites/builds run sequentially and dedicated test containers
+are removed afterward. Rate limiting is optional and deferred.
+
+Day12 reports/check evidence: `target/day12-reports`. The live Grafana check
+also verifies the new six-panel resilience dashboard. See the
+[Day12 runbook](../docs/day12-resilience.md) for retry safety, time budgets,
+error codes and delivery limits.

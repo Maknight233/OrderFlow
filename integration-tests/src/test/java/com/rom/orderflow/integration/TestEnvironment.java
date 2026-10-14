@@ -75,9 +75,13 @@ final class TestEnvironment implements AutoCloseable {
             properties.put("spring.cloud.gateway.server.webflux.routes[0].id", "order-service");
             properties.put("spring.cloud.gateway.server.webflux.routes[0].uri", "http://localhost:18081");
             properties.put("spring.cloud.gateway.server.webflux.routes[0].predicates[0]", "Path=/api/orders/**");
+            properties.put("spring.cloud.gateway.server.webflux.routes[0].filters[0].name", "Resilient");
+            properties.put("spring.cloud.gateway.server.webflux.routes[0].filters[0].args.name", "order-service");
             properties.put("spring.cloud.gateway.server.webflux.routes[1].id", "inventory-service");
             properties.put("spring.cloud.gateway.server.webflux.routes[1].uri", "http://localhost:18082");
             properties.put("spring.cloud.gateway.server.webflux.routes[1].predicates[0]", "Path=/api/inventory/**");
+            properties.put("spring.cloud.gateway.server.webflux.routes[1].filters[0].name", "Resilient");
+            properties.put("spring.cloud.gateway.server.webflux.routes[1].filters[0].args.name", "inventory-service");
         }
         properties.put("spring.datasource.hikari.connection-timeout", "2000");
         properties.put("spring.datasource.hikari.validation-timeout", "1000");

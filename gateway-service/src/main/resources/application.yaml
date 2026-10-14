@@ -11,14 +11,29 @@ spring:
     gateway:
       server:
         webflux:
+          httpclient:
+            connect-timeout: ${GATEWAY_CONNECT_TIMEOUT_MS:1000}
+            response-timeout: ${GATEWAY_RESPONSE_TIMEOUT:3s}
+            pool:
+              type: fixed
+              max-connections: 128
+              acquire-timeout: 1000
           routes:
             - id: order-service
               uri: lb://order-service
+              filters:
+                - name: Resilient
+                  args:
+                    name: order-service
               predicates:
                 - Path=/api/orders/**
 
             - id: inventory-service
               uri: lb://inventory-service
+              filters:
+                - name: Resilient
+                  args:
+                    name: inventory-service
               predicates:
                   - Path=/api/inventory/**
 
@@ -26,6 +41,40 @@ eureka:
   client:
     serviceUrl:
       defaultZone: http://localhost:8761/eureka/
+
+orderflow:
+  resilience:
+    get-max-attempts: ${GATEWAY_GET_MAX_ATTEMPTS:2}
+    retry-backoff: ${GATEWAY_RETRY_BACKOFF:200ms}
+    max-concurrent-calls: ${GATEWAY_MAX_CONCURRENT_CALLS:64}
+
+spring.cloud.circuitbreaker.bulkhead.resilience4j.enabled: false
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: ${GATEWAY_CB_MIN_CALLS:10}
+        failure-rate-threshold: ${GATEWAY_CB_FAILURE_RATE:50}
+        wait-duration-in-open-state: ${GATEWAY_CB_OPEN_WAIT:10s}
+        permitted-number-of-calls-in-half-open-state: ${GATEWAY_CB_HALF_OPEN_CALLS:3}
+        automatic-transition-from-open-to-half-open-enabled: false
+    instances:
+      order-service:
+        base-config: default
+      inventory-service:
+        base-config: default
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: ${GATEWAY_TOTAL_TIMEOUT:7s}
+        cancel-running-future: true
+    instances:
+      order-service:
+        base-config: default
+      inventory-service:
+        base-config: default
 management:
   endpoints:
     web:

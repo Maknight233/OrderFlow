@@ -1,10 +1,10 @@
 # Day 10 observability summary
 
-Generated: 2026-10-13T19:11:15-04:00
-Verification completed: 2026-10-13T23:11:15.4708428Z
+Generated: 2026-10-14T16:58:42-04:00
+Verification completed: 2026-10-14T20:58:42.7270126Z
 
 Result: **29/29 passed**, failures: 0, errors: 0, skipped: 0.
-Suite elapsed time: **1196.812 seconds** (includes service startup/restarts).
+Suite elapsed time: **1304.255 seconds** (includes service startup/restarts).
 
 Scope: health probes, Prometheus business metrics, structured logs, durable
 HTTP/Kafka tracing, Grafana dashboards, Prometheus alerts and operator recovery.
@@ -34,47 +34,47 @@ Prometheus configuration: **PASS**; alert rule tests: **PASS**.
 ### Day9 regression
 
 **20/20 passed**, failures: 0, errors: 0, skipped: 0.
-Elapsed: **835.422 seconds**, including process startup/restarts.
+Elapsed: **882.028 seconds**, including process startup/restarts.
 
 | Scenario | Result | Seconds |
 |---|---|---:|
-| freshAndLegacyFlywayMigrationsPreserveRecoveryState | PASS | 4.249 |
-| multiSkuOrderCompletesAndMergesRepeatedSkus | PASS | 5.323 |
-| failedMultiSkuReservationRollsBackAllStockAndCancels(String)[1] | PASS | 1.589 |
-| failedMultiSkuReservationRollsBackAllStockAndCancels(String)[2] | PASS | 1.261 |
-| duplicateCommandsAndResultsHaveOneBusinessEffect | PASS | 2.926 |
-| releaseBeforeReserveAndLateResultsCannotReopenCancelledOrder | PASS | 85.144 |
-| releaseFirstRestoresReservedStockOnlyOnce | PASS | 85.285 |
-| confirmationFirstWinsRacingCancellation | PASS | 127.323 |
-| concurrentOrdersCannotOversellLastItem | PASS | 1.571 |
-| inventoryOutboxFailureKeepsAtomicResultAndRecoversAfterRestart | PASS | 105.805 |
-| brokerOutageRetainsOrderAndPublishesAutomaticallyAfterRecovery | PASS | 20.992 |
-| databaseFailureRollsBackStockInboxAndOutboxThenReplaysFromDlt | PASS | 6.394 |
-| poisonMessagesReachBothDltsWithoutBlockingValidOrders | PASS | 9.088 |
-| reservationTimeoutAndExhaustedCompensationSupportManualRecovery | PASS | 46.946 |
-| crashAfterOutboxClaimRecoversAndFailedCommandsCanBeRetried | PASS | 163.503 |
-| postgresSkipLockedAllowsTwoWorkersToClaimDifferentEvents | PASS | 79.174 |
-| invalidOrdersReturnBadRequestWithoutPersistingBusinessState | PASS | 1.666 |
-| legacyOrderPayloadPublishesThroughOutbox | PASS | 2.599 |
-| legacyInventoryResultIsAccepted(String)[1] | PASS | 0.953 |
-| legacyInventoryResultIsAccepted(String)[2] | PASS | 0.873 |
+| freshAndLegacyFlywayMigrationsPreserveRecoveryState | PASS | 4.503 |
+| multiSkuOrderCompletesAndMergesRepeatedSkus | PASS | 5.097 |
+| failedMultiSkuReservationRollsBackAllStockAndCancels(String)[1] | PASS | 1.317 |
+| failedMultiSkuReservationRollsBackAllStockAndCancels(String)[2] | PASS | 1.201 |
+| duplicateCommandsAndResultsHaveOneBusinessEffect | PASS | 3.183 |
+| releaseBeforeReserveAndLateResultsCannotReopenCancelledOrder | PASS | 87.702 |
+| releaseFirstRestoresReservedStockOnlyOnce | PASS | 89.222 |
+| confirmationFirstWinsRacingCancellation | PASS | 129.819 |
+| concurrentOrdersCannotOversellLastItem | PASS | 1.506 |
+| inventoryOutboxFailureKeepsAtomicResultAndRecoversAfterRestart | PASS | 106.170 |
+| brokerOutageRetainsOrderAndPublishesAutomaticallyAfterRecovery | PASS | 22.662 |
+| databaseFailureRollsBackStockInboxAndOutboxThenReplaysFromDlt | PASS | 6.341 |
+| poisonMessagesReachBothDltsWithoutBlockingValidOrders | PASS | 8.871 |
+| reservationTimeoutAndExhaustedCompensationSupportManualRecovery | PASS | 48.340 |
+| crashAfterOutboxClaimRecoversAndFailedCommandsCanBeRetried | PASS | 181.911 |
+| postgresSkipLockedAllowsTwoWorkersToClaimDifferentEvents | PASS | 83.445 |
+| invalidOrdersReturnBadRequestWithoutPersistingBusinessState | PASS | 0.988 |
+| legacyOrderPayloadPublishesThroughOutbox | PASS | 3.121 |
+| legacyInventoryResultIsAccepted(String)[1] | PASS | 0.501 |
+| legacyInventoryResultIsAccepted(String)[2] | PASS | 0.461 |
 
 ### Day10 observability
 
 **9/9 passed**, failures: 0, errors: 0, skipped: 0.
-Elapsed: **361.390 seconds**, including process startup/restarts.
+Elapsed: **422.227 seconds**, including process startup/restarts.
 
 | Scenario | Result | Seconds |
 |---|---|---:|
-| probesAndPrometheusEndpointsExposeOnlyIntendedData | PASS | 1.391 |
-| gatewayOrderKafkaResultsShareOneTraceAndCommittedMetrics | PASS | 7.518 |
-| brokerOutageKeepsReadinessAndTraceWhileMetricsShowFailure | PASS | 23.478 |
-| persistedTraceSurvivesOrderProcessCrash | PASS | 86.791 |
-| poisonMessagePublishesDltMetricAndRealPrometheusAlert | PASS | 9.218 |
-| failedOutboxAndManualSagaGaugesReachAlertmanagerAndRecover | PASS | 104.586 |
-| databaseOutageFailsReadinessButPreservesLivenessAndMetricScrapes | PASS | 12.870 |
-| rolledBackSagaTransitionAndDuplicateResultDoNotInflateCounters | PASS | 6.836 |
-| grafanaProvisionsDashboardAndBothDatasources | PASS | 0.099 |
+| probesAndPrometheusEndpointsExposeOnlyIntendedData | PASS | 3.479 |
+| gatewayOrderKafkaResultsShareOneTraceAndCommittedMetrics | PASS | 6.460 |
+| brokerOutageKeepsReadinessAndTraceWhileMetricsShowFailure | PASS | 21.612 |
+| persistedTraceSurvivesOrderProcessCrash | PASS | 116.833 |
+| poisonMessagePublishesDltMetricAndRealPrometheusAlert | PASS | 9.342 |
+| failedOutboxAndManualSagaGaugesReachAlertmanagerAndRecover | PASS | 127.314 |
+| databaseOutageFailsReadinessButPreservesLivenessAndMetricScrapes | PASS | 12.976 |
+| rolledBackSagaTransitionAndDuplicateResultDoNotInflateCounters | PASS | 7.254 |
+| grafanaProvisionsDashboardAndBothDatasources | PASS | 0.095 |
 
 Combined result: **29/29 passed**, failures: 0, errors: 0, skipped: 0.
 

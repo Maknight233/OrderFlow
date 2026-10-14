@@ -245,6 +245,17 @@ class ObservabilityIntegrationTest {
         String auth = "Basic " + Base64.getEncoder().encodeToString("admin:orderflow-local".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         JsonNode dashboard = monitor("http://localhost:13000/api/dashboards/uid/orderflow-overview", Map.of("Authorization", auth));
         assertEquals(12, dashboard.get("dashboard").get("panels").size());
+        JsonNode resilience = monitor("http://localhost:13000/api/dashboards/uid/orderflow-resilience", Map.of("Authorization", auth));
+        assertEquals(6, resilience.get("dashboard").get("panels").size());
+        Set<String> queries = new HashSet<>();
+        resilience.get("dashboard").get("panels").forEach(panel -> {
+            assertEquals("orderflow-prometheus", panel.get("datasource").get("uid").asText());
+            queries.add(panel.get("targets").get(0).get("expr").asText());
+        });
+        assertTrue(queries.stream().anyMatch(query -> query.contains("resilience4j_circuitbreaker_state")));
+        assertTrue(queries.stream().anyMatch(query -> query.contains("orderflow_gateway_retries_total")));
+        assertTrue(queries.stream().anyMatch(query -> query.contains("orderflow_gateway_timeouts_total")));
+        assertTrue(queries.stream().anyMatch(query -> query.contains("orderflow_gateway_rejected_total")));
         JsonNode sources = monitor("http://localhost:13000/api/datasources", Map.of("Authorization", auth));
         Set<String> ids = new HashSet<>();
         sources.forEach(s -> ids.add(s.get("uid").asText()));
