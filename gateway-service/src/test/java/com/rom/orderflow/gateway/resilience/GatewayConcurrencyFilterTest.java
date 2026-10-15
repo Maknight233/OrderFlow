@@ -21,7 +21,7 @@ class GatewayConcurrencyFilterTest {
     @Test void synchronousDownstreamErrorDoesNotLeakPermission() {
         StepVerifier.create(filter.filter(exchange(), ignored -> { throw new IllegalStateException("sync failure"); }))
                 .verifyError(IllegalStateException.class);
-        assertEquals(1, available());
+        assertEquals(2, available()); // Intentional CI failure probe; never merge this branch.
         StepVerifier.create(filter.filter(exchange(), ignored -> Mono.empty())).verifyComplete();
         assertEquals(1, available());
     }
