@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build-test:
+    name: build-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 21 and Maven cache
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: '**/pom.xml'
+
+      - name: Package all four services
+        run: |
+          mkdir -p target/ci
+          mvn -B -ntp -DskipTests package 2>&1 | tee target/ci/package.log
+
+      - name: Run standalone Gateway unit tests
+        run: |
+          mvn -B -ntp -pl gateway-service -Dtest=GatewayConcurrencyFilterTest test 2>&1 | tee target/ci/unit-tests.log
+
+      - name: Upload Maven reports and logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: maven-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            **/target/surefire-reports/**
+            target/ci/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  docker-smoke:
+    name: docker-smoke
+    needs: build-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      # Build one image at a time to reduce peak memory on private-repo runners.
+      COMPOSE_PARALLEL_LIMIT: '1'
+      BUILDKIT_PROGRESS: plain
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Check runner and Compose configuration
+        run: |
+          mkdir -p target/ci
+          {
+            docker version
+            docker compose version
+            python3 --version
+            free -h
+            df -h
+            docker compose --env-file .env.example config --quiet
+          } 2>&1 | tee target/ci/runner.log
+
+      - name: Build four images and run all 15 Docker smoke checks
+        # SIGINT lets the script write its report and collect logs before cleanup.
+        # Leave four minutes for cleanup and time for artifact upload afterward.
+        run: |
+          timeout --signal=INT --kill-after=240s 40m python3 -u scripts/docker-smoke.py 2>&1 | tee target/ci/docker-smoke.log
+
+      - name: Verify complete smoke report
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          reports = list(Path('integration-tests/target/docker-smoke').glob('*/report.json'))
+          if len(reports) != 1:
+              raise SystemExit(f'Expected one smoke report, found {len(reports)}')
+          report = json.loads(reports[0].read_text())
+          checks = report['checks']
+          if report['status'] != 'PASS' or len(checks) != 15 or any(check['status'] != 'PASS' for check in checks):
+              raise SystemExit('Docker smoke acceptance requires 15/15 PASS')
+          print('Docker smoke acceptance: 15/15 PASS')
+          PY
+
+      - name: Upload Docker reports, HTTP traces and service logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: docker-smoke-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            integration-tests/target/docker-smoke/**
+            target/ci/**
+          if-no-files-found: warn
+          retention-days: 14
