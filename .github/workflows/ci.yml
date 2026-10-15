@@ -62,7 +62,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     env:
-      # Build one image at a time to reduce peak memory on private-repo runners.
+      # Limit Compose engine concurrency; Dockerfiles lock their shared Maven cache.
       COMPOSE_PARALLEL_LIMIT: '1'
       BUILDKIT_PROGRESS: plain
       PYTHONUNBUFFERED: '1'

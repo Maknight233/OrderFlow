@@ -2,9 +2,9 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /build
 COPY order-service/pom.xml pom.xml
-RUN --mount=type=cache,target=/root/.m2 mvn -B -ntp -DskipTests dependency:go-offline
+RUN --mount=type=cache,target=/root/.m2,sharing=locked mvn -B -ntp -e -DskipTests dependency:go-offline
 COPY order-service/src src
-RUN --mount=type=cache,target=/root/.m2 mvn -B -ntp -DskipTests package
+RUN --mount=type=cache,target=/root/.m2,sharing=locked mvn -B -ntp -e -DskipTests package
 
 FROM eclipse-temurin:21-jre-jammy AS runtime
 RUN apt-get update \

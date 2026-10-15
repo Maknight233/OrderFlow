@@ -29,7 +29,9 @@ Order/Inventory 的 PostgreSQL、Kafka 测试不加入默认 `mvn test`。
 [`integration-tests/README.md`](../integration-tests/README.md)。
 
 Docker 沿用 [Day 13 脚本](day13-docker.md)，使用唯一项目名、临时端口和独立卷。
-`COMPOSE_PARALLEL_LIMIT=1` 降低四个镜像同时构建的内存峰值；
+`COMPOSE_PARALLEL_LIMIT=1` 限制 Compose 引擎调用并发；Bake 仍可能并行构建镜像，
+四个 Dockerfile 的 Maven 缓存使用 `sharing=locked`，串行执行 Maven 阶段，
+避免同时写入同一个依赖缓存并降低内存峰值。Maven `-e` 保留构建失败原因链；
 `runner.log` 记录实际内存、磁盘和 Docker 版本。
 脚本执行限制为 40 分钟，随后发送 SIGINT，让现有异常处理写报告、收集日志并清理；
 额外留出 4 分钟清理宽限及上传时间。Job 的 50 分钟硬超时或 Runner 中断仍可能截断上传。
