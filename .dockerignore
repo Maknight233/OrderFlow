@@ -1,0 +1,13 @@
+**
+!pom.xml
+!discovery-service/
+!gateway-service/
+!order-service/
+!inventory-service/
+!**/pom.xml
+!**/src/
+!**/src/main/
+!**/src/main/**
+!**/Dockerfile
+**/target/
+**/.env*

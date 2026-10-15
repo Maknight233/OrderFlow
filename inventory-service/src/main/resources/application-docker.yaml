@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://postgres:5432/inventory_db}
+    username: ${DB_USERNAME:orderflow}
+    password: ${DB_PASSWORD:orderflow}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:29092}
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+
+eureka:
+  instance:
+    hostname: ${SERVICE_HOSTNAME:inventory-service}
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_URL:http://discovery-service:8761/eureka/}
+
+management:
+  tracing:
+    export:
+      zipkin:
+        enabled: ${TRACING_ENABLED:false}

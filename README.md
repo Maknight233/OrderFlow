@@ -506,30 +506,50 @@ processed_events
 
 ---
 
-## Running Infrastructure
+## Run with Docker
 
-Start infrastructure:
+Prerequisites: Docker Desktop with Linux containers and Docker Compose v2.20+.
+Java and Maven are supplied by the four Java 21 multi-stage image builds.
 
-```bash
-docker compose up -d
+```powershell
+Copy-Item .env.example .env
+docker compose up -d --build --wait --wait-timeout 300
+docker compose ps
 ```
 
-Typical local infrastructure:
+This starts PostgreSQL, Redis, Kafka and the four Java services (including Eureka)
+on one Compose network. The Gateway is at `http://localhost:9000`; Eureka is at
+`http://localhost:8761`. All published ports bind to the local machine.
+See [.env.example](.env.example) for port and credential settings.
 
-```text
-PostgreSQL :5432
-Redis      :6379
-Kafka      :9092
+```powershell
+# Automated, isolated end-to-end and failure-recovery checks (Python 3.10+).
+python scripts/docker-smoke.py
+# Reuse images already built by Compose:
+python scripts/docker-smoke.py --skip-build
+
+# Stop the development stack while retaining all data:
+docker compose down
 ```
 
-Then start services:
+The Smoke Test uses a unique Compose project, fresh volumes, random host ports
+and separate database credentials. It verifies Saga success/compensation,
+Outbox retries, duplicate Kafka delivery, Redis fallback, Day12 circuit breaking,
+JVM crash restart and persistence across container recreation. Reports and logs
+are saved under `integration-tests/target/docker-smoke/<project>/`.
 
-```text
-Discovery Service
-Gateway Service
-Order Service
-Inventory Service
+For IntelliJ development, start only infrastructure and run the four Java
+applications with their existing default profile:
+
+```powershell
+docker compose up -d --wait postgres redis kafka
 ```
+
+Keep the default ports/credentials when using the unchanged IntelliJ settings.
+Stop the containerized Java services first if switching from the full stack.
+Kafka advertises `kafka:29092` inside Docker and `localhost:9092` to local JVMs.
+See the [Docker runbook](docs/day13-docker.md) for profiles, health checks,
+data volumes, observability and recovery instructions.
 
 ---
 
@@ -695,6 +715,10 @@ including all Day9-Day11 regressions and live Grafana dashboard validation.
 Run `powershell -File scripts/run-day12-tests.ps1 -RunRegressions` to reproduce.
 Rate limiting remains optional and deferred.
 
+Day 13 adds Java 21 container images, a complete seven-service Compose stack,
+Docker profiles and an isolated, automated container Smoke Test. See the
+[Docker runbook](docs/day13-docker.md) and [verification results](docs/day13-docker-summary.md).
+
 Completed:
 
 ```text
@@ -760,6 +784,11 @@ Reactive Gateway circuit breakers and bounded HTTP timeouts
 GET-only retries, standard fallback and concurrency protection
 Resilience metrics/dashboard and fault-injection Saga consistency tests
 Day9-Day11 regression
+
+Day 13
+Java 21 multi-stage images and seven-service Docker Compose
+Docker profiles, service DNS, health checks and persistent data volumes
+Container workflow, fault recovery and persistence Smoke Test
 ```
 
 ---
@@ -773,7 +802,6 @@ Order workflow state management
 Cache consistency and load testing
 Distributed rate limiting
 Integration testing
-Containerization
 Kubernetes deployment
 AWS deployment
 CI/CD

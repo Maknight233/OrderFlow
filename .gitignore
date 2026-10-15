@@ -40,3 +40,9 @@ build/
 ### OS ###
 .DS_Store
 Thumbs.db
+
+# Local Docker configuration (keep the template tracked)
+.env
+.env.*
+!.env.example
+__pycache__/

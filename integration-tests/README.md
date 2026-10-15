@@ -1,5 +1,12 @@
 # Saga integration tests
 
+For the complete container deployment (including Eureka and Gateway), run
+`python scripts/docker-smoke.py` from the repository root. It builds and tests
+the seven-service stack in a unique disposable Compose project, including
+Redis/Kafka outages, duplicate delivery, Day12 circuits, JVM restart and data
+persistence. Use `--skip-build` to reuse images. See the
+[Docker runbook](../docs/day13-docker.md) for coverage and evidence paths.
+
 The suite starts the two packaged services as separate JVMs and uses real
 PostgreSQL and Kafka in the disposable Docker Compose project orderflow-it.
 It never connects to the development databases or broker.

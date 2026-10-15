@@ -1,0 +1,19 @@
+eureka:
+  instance:
+    hostname: ${SERVICE_HOSTNAME:gateway-service}
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_URL:http://discovery-service:8761/eureka/}
+    registry-fetch-interval-seconds: 5
+
+spring:
+  cloud:
+    loadbalancer:
+      cache:
+        ttl: 5s
+
+management:
+  tracing:
+    export:
+      zipkin:
+        enabled: ${TRACING_ENABLED:false}

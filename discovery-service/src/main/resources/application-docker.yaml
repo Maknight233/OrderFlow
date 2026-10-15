@@ -1,0 +1,16 @@
+eureka:
+  instance:
+    hostname: discovery-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState
