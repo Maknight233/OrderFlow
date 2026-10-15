@@ -793,6 +793,35 @@ Container workflow, fault recovery and persistence Smoke Test
 
 ---
 
+## Continuous Integration (Day 14)
+
+[CI runs](https://github.com/Maknight233/OrderFlow/actions/workflows/ci.yml) execute
+on every branch Push and Pull Request using Java 21 and a Maven dependency cache.
+`build-test` packages all four services and runs the three standalone
+`GatewayConcurrencyFilterTest` tests. Once it passes, `docker-smoke` builds the
+four images and runs the seven-service, 15-check Docker test suite.
+
+```powershell
+mvn -B -ntp -DskipTests package
+mvn -B -ntp -pl gateway-service '-Dtest=GatewayConcurrencyFilterTest' test
+python scripts/docker-smoke.py
+```
+
+Download the `maven-reports-*` and `docker-smoke-reports-*` artifacts from the
+Actions run page. Reports upload on success and failure and are retained for
+14 days, including Surefire XML, Docker `report.json`, Compose output, HTTP
+request timings and service logs. For failures, inspect the failed step and
+`report.json.error`, then correlate HTTP timings with `services.log`.
+
+To enforce merge checks, protect `main` and require both `build-test` and
+`docker-smoke`, including for administrators. **This private repository's
+current GitHub plan blocks branch protection (API HTTP 403); failed CI alone
+does not yet prevent merging.** See the [CI runbook](docs/day14-ci.md) for setup
+and troubleshooting, and the [acceptance record](docs/day14-ci-summary.md) for
+remote evidence and outstanding items.
+
+---
+
 ## Planned Improvements
 
 Future development will continue toward:
@@ -804,7 +833,7 @@ Distributed rate limiting
 Integration testing
 Kubernetes deployment
 AWS deployment
-CI/CD
+Continuous deployment
 ```
 
 ---
