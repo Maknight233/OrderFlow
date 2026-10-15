@@ -23,4 +23,8 @@
 Docker 报告也成功上传并下载。日志显示四个 Maven 构建并发访问同一 BuildKit 缓存；
 已为缓存增加排他锁，并启用 Maven 异常原因链输出，继续远程验证。
 
+随后远程运行完成四镜像构建和七服务健康检查，前 9 项通过；
+服务重启恢复阶段暴露 Gateway DNS 缓存问题。Order/Inventory 已重新注册并提交 Saga，
+Gateway 持续返回 503；Docker profile 已加入 5 秒 DNS 缓存上限，继续验证全部 15 项。
+
 运行与排查说明见 [day14-ci.md](day14-ci.md)。

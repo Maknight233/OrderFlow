@@ -37,6 +37,12 @@ Docker 沿用 [Day 13 脚本](day13-docker.md)，使用唯一项目名、临时�
 额外留出 4 分钟清理宽限及上传时间。Job 的 50 分钟硬超时或 Runner 中断仍可能截断上传。
 最终报告必须为 `PASS` 且恰好 15 项全部通过，才接受 Docker 检查。
 
+Gateway 的 Docker profile 将 Netty DNS 缓存上限设为 5 秒，配合 Eureka 和
+LoadBalancer 刷新：Compose 重启可能重新分配服务 IP，Gateway 需要重新解析服务名。
+CI 的重启恢复检查覆盖这一场景；HTTP 响应/总超时仍为 Day 12 的 3 秒/7 秒。
+配置依据：[Reactor Netty DNS 缓存](https://projectreactor.io/docs/netty/release/reference/http-client.html#_host_name_resolution)、
+[Compose 动态 IP](https://docs.docker.com/compose/how-tos/networking/#update-containers-on-the-network)。
+
 ## 下载报告与排查
 
 打开仓库 **Actions → CI → 对应运行 → Artifacts**。
