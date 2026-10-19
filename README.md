@@ -868,7 +868,7 @@ docker compose up -d --no-build --wait --wait-timeout 300
 
 Publishing uses only the ephemeral `GITHUB_TOKEN` with job-level
 `packages: write`. No PAT is stored in this repository. Packages remain private
-and link to this repository through the OCI source label. Confirm inheritance
+and carry this repository's OCI source label. Confirm inheritance
 and Actions access in each package's settings before using another repository
 to deploy them.
 

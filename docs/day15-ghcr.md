@@ -82,6 +82,12 @@ OCI `org.opencontainers.image.source` 指向 `https://github.com/Maknight233/Ord
 4. 若同名 Package 曾由 CLI 创建而未关联仓库，先修正关联/Actions access；
    `packages: write` 不会自动授予一个未授权既有 Package 的访问权。
 
+发布验收核对 Package API 的 `visibility=private`、镜像的 source/revision 标签，
+并实际使用当前 workflow token push/pull。API 若提供 `repository`，额外核对其稳定的
+repository ID；该字段为可选元数据。首次远程响应对四个 Package 均未返回此字段，
+不能把字段缺失直接解释为 token 没有访问权限。继承复选框与关联设置仍可在 Package settings
+按上面步骤核对；不声称 API 已验证未返回的 UI 设置。
+
 本机拉取私有镜像需已登录 GHCR。需要时用具有 `read:packages` 的个人凭据
 通过 `docker login ghcr.io --username Maknight233 --password-stdin` 从标准输入登录，
 凭据交给本机 credential store；不要写入命令历史、README、`.env`、仓库或 Actions Secrets。
