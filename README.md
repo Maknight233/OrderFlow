@@ -849,7 +849,8 @@ flowchart LR
 
 Each image has `sha-<full 40-character commit SHA>`; `main` follows the latest
 fully verified release. No `latest` tag is generated. Deploy a recorded SHA tag
-or digest. Version-tag metadata is prepared for future `v1.0.0` releases; Git
+or digest. Publishing refuses to replace an existing SHA tag with different
+content. Version-tag metadata is prepared for future `v1.0.0` releases; Git
 tag pushes do not currently publish. Images target `linux/amd64`.
 
 ```powershell

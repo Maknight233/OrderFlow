@@ -45,7 +45,11 @@
 main 的 SHA 是 main Push 提交（合并时为合并提交），并非 PR 的临时 merge SHA。
 `main` 只用于定位最新通过发布验证的构建，不用于固定版本部署；禁用 `latest`。
 
-SHA 标签提供提交到镜像的映射。GHCR 标签本身可被有写权限的人修改，
+SHA 标签提供提交到镜像的映射。发布前逐页查询 Package 版本；若同名 SHA 标签已存在，
+只接受相同 digest，拒绝以重新构建的不同内容覆盖它。scanner/registry 失败重跑应优先
+选择 **Re-run failed jobs**，使用同次运行已批准的镜像归档；归档过期则需重新构建与扫描。
+如已发布 SHA 的重新构建产生不同 digest，应沿用原镜像或创建新提交发布。
+GHCR 标签本身仍可被仓库外有写权限的人修改，
 且浮动基础镜像、软件源和构建时间使同一源码重新构建不保证逐字节相同。
 发布 Job 在 Actions Summary 记录 `image@sha256:...`，正式部署应优先记录并使用
 该不可变 digest；保留部署 SHA/digest 才能准确回滚。不要通过重新构建旧提交恢复旧镜像。
@@ -55,8 +59,10 @@ SHA 标签提供提交到镜像的映射。GHCR 标签本身可被有写权限�
 1. 在 `on.push.tags` 加入 `v[0-9]*.[0-9]*.[0-9]*`，并验证 Tag 是 main 上的提交。
 2. 扩展归档上传、`publish-images` 的事件条件，使受信任 Tag Push 可以进入；
    保持 PR、手动运行没有发布入口。
-3. 发布 metadata 已有 `type=semver,pattern={{version}}` 模板；在发布 Job 也启用它，
-   将 `v1.0.0` 映射到 `1.0.0`，同时保留完整 SHA 标签，仍设置 `latest=false`。
+3. 发布 metadata 已有 `type=semver,pattern={{version}}` 模板；在正式发布 Job 也启用它，
+   将 `v1.0.0` 映射到 `1.0.0`，仍设置 `latest=false`。
+   应给该提交已经扫描并发布的 SHA 镜像增加版本别名，使二者指向同一 digest，
+   避免重新构建后触发 SHA 防覆盖门禁；不存在 SHA 镜像时必须先完成完整测试、构建和扫描。
 4. `promote-main` 保持只处理 main，版本发布不移动 main 标签；保护 `v*` 标签，
    防止已发布版本被重新指向其他提交。
 
@@ -112,6 +118,7 @@ HIGH/CRITICAL 无论是否已有补丁都阻止发布；数据库下载、解析
 JSON 报告通过 `if: always()` 上传，名称包含服务、run ID、attempt，保留 14 天。
 扫描未产生报告时上传步骤也失败并在日志说明文件缺失，不能解释为“没有漏洞”。
 扫描通过的 main 构建另保存 OCI 归档 3 天，仅作为同次运行的发布输入。
+归档名称包含服务和 run ID，完整重跑会替换它；只重跑失败发布 Job 可复用此前成功扫描的归档。
 不用付费私有仓库 Code Scanning 能力也可下载 JSON，因此无需 SARIF 上传权限。
 
 处理失败时先从 Artifact 确认 CVE、依赖路径与修复版本，再升级基础镜像/应用依赖。
