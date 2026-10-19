@@ -108,12 +108,20 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
-      - name: Scan the exact image archive (HIGH and CRITICAL block release)
+      - name: Unpack OCI layout for Trivy
+        env:
+          IMAGE_DIR: ${{ runner.temp }}/image-layout
+          IMAGE_ARCHIVE: ${{ runner.temp }}/image.tar
+        run: |
+          mkdir -p "$IMAGE_DIR"
+          tar -xf "$IMAGE_ARCHIVE" -C "$IMAGE_DIR"
+
+      - name: Scan the exact image (HIGH and CRITICAL block release)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: v0.76.0
           scan-type: image
-          input: ${{ runner.temp }}/image.tar
+          input: ${{ runner.temp }}/image-layout
           scanners: vuln
           severity: HIGH,CRITICAL
           ignore-unfixed: false
@@ -220,11 +228,28 @@ jobs:
           PUBLISHED_DIGEST: ${{ steps.push.outputs.digest }}
           IMAGE: ${{ steps.image.outputs.name }}
           COMMIT_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          OWNER_TYPE: ${{ github.event.repository.owner.type }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           test "$EXPECTED_DIGEST" = "$PUBLISHED_DIGEST"
           docker pull "$IMAGE:sha-$COMMIT_SHA"
           test "$(docker image inspect "$IMAGE:sha-$COMMIT_SHA" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$COMMIT_SHA"
           docker run --rm --entrypoint java "$IMAGE:sha-$COMMIT_SHA" -version
+          owner_path=users
+          if [[ "$OWNER_TYPE" == Organization ]]; then owner_path=orgs; fi
+          package="${IMAGE##*/}"
+          gh api "$owner_path/$OWNER/packages/container/$package" > package.json
+          python3 - <<'PY'
+          import json, os
+          package = json.load(open('package.json'))
+          if package['visibility'] != 'private':
+              raise SystemExit('Expected a private GHCR package')
+          if package.get('repository', {}).get('full_name') != os.environ['REPOSITORY']:
+              raise SystemExit('Package is not linked to this repository')
+          print('Verified private Package, source repository and workflow token read/write access')
+          PY
           printf '%s@%s\n' "$IMAGE" "$PUBLISHED_DIGEST" >> "$GITHUB_STEP_SUMMARY"
 
   promote-main:
