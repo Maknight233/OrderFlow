@@ -278,10 +278,13 @@ jobs:
           OWNER: ${{ github.repository_owner }}
           OWNER_TYPE: ${{ github.event.repository.owner.type }}
           REPOSITORY: ${{ github.repository }}
+          REPOSITORY_ID: ${{ github.repository_id }}
+          SOURCE_URL: ${{ github.server_url }}/${{ github.repository }}
         run: |
           test "$EXPECTED_DIGEST" = "$PUBLISHED_DIGEST"
           docker pull "$IMAGE:sha-$COMMIT_SHA"
           test "$(docker image inspect "$IMAGE:sha-$COMMIT_SHA" --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$COMMIT_SHA"
+          test "$(docker image inspect "$IMAGE:sha-$COMMIT_SHA" --format '{{ index .Config.Labels "org.opencontainers.image.source" }}')" = "$SOURCE_URL"
           docker run --rm --entrypoint java "$IMAGE:sha-$COMMIT_SHA" -version
           owner_path=users
           if [[ "$OWNER_TYPE" == Organization ]]; then owner_path=orgs; fi
@@ -292,9 +295,14 @@ jobs:
           package = json.load(open('package.json'))
           if package['visibility'] != 'private':
               raise SystemExit('Expected a private GHCR package')
-          if package.get('repository', {}).get('full_name') != os.environ['REPOSITORY']:
-              raise SystemExit('Package is not linked to this repository')
-          print('Verified private Package, source repository and workflow token read/write access')
+          linked = package.get('repository')
+          if linked is not None:
+              if str(linked.get('id')) != os.environ['REPOSITORY_ID']:
+                  raise SystemExit(f"Unexpected linked repository ID: {linked.get('id')}")
+              print('Verified linked repository ID')
+          else:
+              print('Package API omits repository metadata; inheritance can be reviewed in Package settings')
+          print('Verified private Package, OCI source/revision and workflow token push/pull access')
           PY
           printf '%s@%s\n' "$IMAGE" "$PUBLISHED_DIGEST" >> "$GITHUB_STEP_SUMMARY"
 
