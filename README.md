@@ -822,6 +822,64 @@ remote evidence and outstanding items.
 
 ---
 
+## Container Publishing (Day 15)
+
+The CI workflow builds and scans all four application images with Docker Buildx
+and Trivy. PRs run tests and scans. Only a Push to `main` can publish to GHCR,
+after `build-test`, all 15 `docker-smoke` checks and **every** image scan pass.
+
+```mermaid
+flowchart LR
+    A[Push / PR] --> B[build-test]
+    B --> C[docker-smoke: 15 checks]
+    B --> D[Buildx + Trivy: four images]
+    C --> E{main Push and all checks pass}
+    D --> E
+    E --> F[Publish scanned OCI archives with SHA tags]
+    F --> G[Verify digest and pull all four images]
+    G --> H[Promote main tags]
+```
+
+| Service | GHCR image |
+| --- | --- |
+| Discovery | `ghcr.io/maknight233/orderflow-discovery-service` |
+| Gateway | `ghcr.io/maknight233/orderflow-gateway-service` |
+| Order | `ghcr.io/maknight233/orderflow-order-service` |
+| Inventory | `ghcr.io/maknight233/orderflow-inventory-service` |
+
+Each image has `sha-<full 40-character commit SHA>`; `main` follows the latest
+fully verified release. No `latest` tag is generated. Deploy a recorded SHA tag
+or digest. Version-tag metadata is prepared for future `v1.0.0` releases; Git
+tag pushes do not currently publish. Images target `linux/amd64`.
+
+```powershell
+# After authenticating to the private GHCR package, use a published main SHA:
+$commitSha = '<full-published-commit-sha>'
+docker pull "ghcr.io/maknight233/orderflow-gateway-service:sha-$commitSha"
+docker run --rm --entrypoint java "ghcr.io/maknight233/orderflow-gateway-service:sha-$commitSha" -version
+
+# Use the same fixed version for all four services, without a local rebuild:
+$env:IMAGE_PREFIX = 'ghcr.io/maknight233/orderflow'
+$env:IMAGE_TAG = "sha-$commitSha"
+docker compose pull discovery-service gateway-service order-service inventory-service
+docker compose up -d --no-build --wait --wait-timeout 300
+```
+
+Publishing uses only the ephemeral `GITHUB_TOKEN` with job-level
+`packages: write`. No PAT is stored in this repository. Packages remain private
+and link to this repository through the OCI source label. Confirm inheritance
+and Actions access in each package's settings before using another repository
+to deploy them.
+
+Trivy blocks **all HIGH/CRITICAL OS and Java vulnerabilities, including unfixed
+ones**. Scanner/database failures also fail CI. JSON reports upload on success
+and failure as `trivy-<service>-*` artifacts and remain available for 14 days.
+See the [GHCR runbook](docs/day15-ghcr.md) for permissions, tag rules and release
+recovery, and the [acceptance record](docs/day15-ghcr-summary.md) for executed
+checks and any remaining blockers.
+
+---
+
 ## Planned Improvements
 
 Future development will continue toward:
