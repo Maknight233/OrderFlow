@@ -88,7 +88,9 @@ Java 使用 `/actuator/health/readiness`，Order/Inventory readiness 包含数�
 不包含 Redis 或 Kafka，因此缓存降级与 Outbox 持久化仍可用。
 Discovery 就绪后启动业务服务，所有业务服务健康后启动 Gateway。
 Eureka 注册和客户端缓存可能稍后才收敛，Smoke Test 会另外等待两个真实 Gateway
-只读路由，并初始化首次访问才建立的 Redis/JPA/HTTP 客户端。资源紧张时冷启动首个
+只读路由，并初始化首次访问才建立的 Redis/JPA/HTTP 客户端。每条路由须连续成功达到
+Smoke 的熔断最小调用数，避免发现期间的 503 在后续首次写入时触发熔断。
+资源紧张时冷启动首个
 写请求可能超过 Day12 超时预算，但数据库事务仍然提交；客户端遇到 POST 的 504
 不能直接重发，应先查询业务结果。这一限制与 Day12 保持一致，Smoke Test 不重试 POST。
 

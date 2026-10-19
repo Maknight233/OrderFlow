@@ -2,7 +2,8 @@
 
 2026-10-19：已实现发布流程并创建 [PR #3](https://github.com/Maknight233/OrderFlow/pull/3)。
 最终 head 的 Push / PR 检查均通过，PR 已合并。main 的四镜像已推送并可拉取，
-发布校验错误地要求 Package API 必须返回可选的 `repository` 字段，main 标签因此尚未提升；修复中。
+首次发布校验错误地要求 Package API 必须返回可选的 `repository` 字段，main 标签因此未提升。
+修复 [PR #4](https://github.com/Maknight233/OrderFlow/pull/4) 已通过全部检查并合并，正在核对修复后 main 发布。
 
 | 验收项 | 结果 |
 | --- | --- |
@@ -132,3 +133,30 @@ Package 的 private 断言也通过；随后可选 `repository` 字段缺失被�
 修复为验证实际 push/pull、私有可见性与 OCI source/revision；API 提供 repository 时再核对 ID。
 不以可选字段缺失推断权限错误，不声称继承复选框已通过 API 验证。
 追加四项校验场景：私有且无可选元数据、正确 ID 接受，错误 ID 与 public 拒绝。
+
+修复提交 `95d32d0f009ffddf06684fc01f9ae9d085e2b368` 的
+[Push 39308391109](https://github.com/Maknight233/OrderFlow/actions/runs/39308391109)
+与 [PR 39308432179](https://github.com/Maknight233/OrderFlow/actions/runs/39308432179)
+均完整成功，发布/提升 Job 均 skipped。已下载两份 Smoke 报告：
+`orderflow-smoke-4b6c9138f8` 与 `orderflow-smoke-63688ce7ee` 均为 15/15 PASS、`error: null`；
+PR 的 Maven 3/3、四个 Trivy JSON HIGH/CRITICAL 均为 0。
+
+PR #4 合并前确认 CLEAN / MERGEABLE，使用 expected head SHA 校验合并；
+main 提交为 `c5b9cfea5bfd4be1fee306bfc6ee520c4b9fe058`，
+触发 [修复后 main 运行 39310091882](https://github.com/Maknight233/OrderFlow/actions/runs/39310091882)。
+
+修复后 main 的 Maven 与四个扫描 Job 已成功；已下载对应 Maven 与四份 Trivy JSON，
+确认 3/3 单元测试、四镜像 HIGH 0 / CRITICAL 0。Smoke 随后在启动预热阶段失败，
+发布和 main 标签提升正确 skipped；预热修复后继续验收。
+
+## Smoke 启动预热修复
+
+运行 39310091882 的 `orderflow-smoke-3c71cfa564` 通过容器健康与 Kafka metadata 两项后失败。
+HTTP 记录为：Inventory GET 503、503、404；Order GET 404；Inventory POST 201；第二次 POST 503 CIRCUIT_OPEN。
+Gateway 日志同时记录 Eureka 服务尚未进入 LoadBalancer 缓存。
+Smoke 配置最小调用数 4、失败率阈值 50%，单次成功探测并不保证启动失败已退出统计窗口。
+
+预热改为每条只读路由连续成功至少 4 次，发生 503 时整个只读探测重新等待，
+使熔断开启/恢复在写入前完成；业务 POST 仍只发送一次，既有 3 秒/7 秒超时与熔断配置不变。
+新增四项标准库 unittest：健康路由、首次成功后熔断、Order 独立恢复、持续发现失败仍阻断。
+本地四项全部通过，加入 `build-test`；业务 Smoke 验收仍要求原有 15/15，不降低门禁。
