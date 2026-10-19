@@ -78,7 +78,7 @@ jobs:
           SERVICE: ${{ matrix.service }}
         run: echo "name=ghcr.io/${REPOSITORY,,}-${SERVICE}" >> "$GITHUB_OUTPUT"
 
-      - name: Generate immutable source tags and OCI labels
+      - name: Generate source tags and OCI labels
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:

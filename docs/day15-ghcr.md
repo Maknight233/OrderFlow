@@ -8,7 +8,8 @@
 
 `build-test` 成功后，`docker-smoke` 与四服务 `scan-images` 并行运行。
 扫描 Job 使用官方 Docker Actions 构建单平台 `linux/amd64` OCI 归档，
-Trivy 扫描归档中的 OS 和 Java 依赖。所有扫描成功且 Smoke 达到 15/15 后，
+将 OCI 归档解包为 layout 目录后，Trivy 扫描其中的 OS 和 Java 依赖。
+所有扫描成功且 Smoke 达到 15/15 后，
 `publish-images` 才能开始；它显式依赖 `build-test`、`docker-smoke`、`scan-images`。
 
 发布使用当前 run/attempt 的归档，以 Buildx 的 `oci-layout://` 命名上下文导出，
@@ -116,6 +117,12 @@ JSON 报告通过 `if: always()` 上传，名称包含服务、run ID、attempt�
 处理失败时先从 Artifact 确认 CVE、依赖路径与修复版本，再升级基础镜像/应用依赖。
 没有可用补丁时保留阻断，不静默设置 `ignore-unfixed` 或将退出码改为 0。
 外部数据库临时不可用可重跑失败检查；重新构建后必须重新扫描。
+
+本次首次本地扫描发现 Jackson 2/3、Tomcat、Kafka 的 lz4 以及 Eureka 页面使用的
+FreeMarker 漏洞。保留 Spring Boot 4.1.1，在服务 POM 中使用受支持的 BOM 属性覆盖
+Jackson 2.21.7 / 3.1.7、Tomcat 11.0.25、FreeMarker 2.3.35，并通过业务服务的
+dependencyManagement 将 `at.yawk.lz4:lz4-java` 固定为 1.11.4。
+Boot BOM 纳入相同或更高修复版本后可移除这些覆盖；升级后仍需重新执行扫描与 Smoke。
 
 ## 发布失败与验收
 
