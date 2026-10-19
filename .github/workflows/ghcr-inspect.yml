@@ -1,0 +1,25 @@
+name: GHCR package inspection
+on:
+  push:
+    branches: [ci/day15-package-inspect]
+permissions:
+  contents: read
+  packages: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Inspect private package metadata without modifying packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+        shell: bash
+        run: |
+          for service in discovery-service gateway-service order-service inventory-service; do
+            repository_lower=${REPOSITORY,,}
+            package="${repository_lower##*/}-$service"
+            gh api "users/$OWNER/packages/container/$package" \
+              --jq '{name, visibility, repository_id: .repository.id, repository_name: .repository.full_name, repository_url: .repository.html_url, keys: keys}'
+          done
