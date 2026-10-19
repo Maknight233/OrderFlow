@@ -7,6 +7,9 @@
 ## 流程与权限
 
 `build-test` 成功后，`docker-smoke` 与四服务 `scan-images` 并行运行。
+`build-test` 除 Gateway 3 项单元测试外，还运行 `scripts/test_docker_smoke.py` 的四项
+只读预热回归。Smoke 在任何写入前，要求两个只读路由连续成功达到配置的最小调用数，
+使发现期间的失败在 GET 阶段完成熔断恢复；不重试 POST，也不修改 Day12 的超时和熔断阈值。
 扫描 Job 使用官方 Docker Actions 构建单平台 `linux/amd64` OCI 归档，
 将 OCI 归档解包为 layout 目录后，Trivy 扫描其中的 OS 和 Java 依赖。
 所有扫描成功且 Smoke 达到 15/15 后，

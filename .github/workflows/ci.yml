@@ -46,6 +46,10 @@ jobs:
         run: |
           mvn -B -ntp -pl gateway-service -Dtest=GatewayConcurrencyFilterTest test 2>&1 | tee target/ci/unit-tests.log
 
+      - name: Verify read-only Docker smoke warmup regression cases
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_docker_smoke.py' -v 2>&1 | tee target/ci/smoke-preflight-tests.log
+
       - name: Upload Maven reports and logs
         if: always()
         uses: actions/upload-artifact@v7

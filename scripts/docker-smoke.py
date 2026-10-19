@@ -133,6 +133,18 @@ class Smoke:
         return self.request("/api/inventory", "POST",
                             {"sku": sku, "productName": "Docker smoke", "quantity": quantity}, 201)
 
+    def warm_routes(self, sku, missing_order):
+        def ready():
+            # Discovery failures count toward the circuit breaker's failure rate.
+            # One successful response can still leave it about to open when its
+            # minimum call count is reached. Exercise that threshold with GETs
+            # so OPEN/HALF_OPEN recovery happens before any non-repeatable POST.
+            for _ in range(int(self.env["GATEWAY_CB_MIN_CALLS"])):
+                self.request(f"/api/inventory/{sku}", expected=404)
+                self.request(f"/api/orders/{missing_order}", expected=404)
+            return True
+        eventually("Gateway routes settle after discovery warmup", ready)
+
     def order(self, items):
         return self.request("/api/orders", "POST", {
             "customerId": str(uuid.uuid4()), "totalAmount": 10, "currency": "USD",
@@ -212,13 +224,10 @@ class Smoke:
             return hosts.issuperset({"order-service", "inventory-service", "gateway-service"})
         eventually("Eureka registers Docker DNS hostnames", registrations)
         sku = "SMOKE-" + uuid.uuid4().hex[:12]
-        eventually("Gateway discovers Inventory via Eureka",
-                   lambda: self.request(f"/api/inventory/{sku}", expected=404) or True)
         # Read-only probes also initialize each route's HTTP/Redis/JPA clients.
         # Never retry a POST whose response timed out: its transaction may have committed.
         missing_order = str(uuid.uuid4())
-        eventually("Gateway discovers Order via Eureka",
-                   lambda: self.request(f"/api/orders/{missing_order}", expected=404) or True)
+        self.warm_routes(sku, missing_order)
         self.stock(sku)
         self.stock(sku + "-EMPTY", 0)
         self.passed("Gateway routes through Eureka and container DNS")

@@ -827,6 +827,8 @@ remote evidence and outstanding items.
 The CI workflow builds and scans all four application images with Docker Buildx
 and Trivy. PRs run tests and scans. Only a Push to `main` can publish to GHCR,
 after `build-test`, all 15 `docker-smoke` checks and **every** image scan pass.
+`build-test` also runs four Python regressions for read-only Gateway warmup,
+so discovery failures settle before Smoke Test writes begin.
 
 ```mermaid
 flowchart LR
