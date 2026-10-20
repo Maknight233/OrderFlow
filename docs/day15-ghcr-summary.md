@@ -1,25 +1,29 @@
 # Day 15 GHCR 验收记录
 
-2026-10-19：已实现发布流程并创建 [PR #3](https://github.com/Maknight233/OrderFlow/pull/3)。
-最终 head 的 Push / PR 检查均通过，PR 已合并。main 的四镜像已推送并可拉取，
-首次发布校验错误地要求 Package API 必须返回可选的 `repository` 字段，main 标签因此未提升。
-修复 [PR #4](https://github.com/Maknight233/OrderFlow/pull/4) 已通过全部检查并合并，正在核对修复后 main 发布。
+2026-10-19：**Day 15 远程 CI/CD 验收完成。**
+[PR #3](https://github.com/Maknight233/OrderFlow/pull/3) 及修复
+[PR #4](https://github.com/Maknight233/OrderFlow/pull/4)、
+[PR #5](https://github.com/Maknight233/OrderFlow/pull/5) 均在完整检查成功后合并 main。
+[最终 main 运行 39313175449](https://github.com/Maknight233/OrderFlow/actions/runs/39313175449)
+全部 Job 成功，发布版本为 `34ed73031211b98b31b487e9182b0d26b9975a73`。
+四个私有镜像的 SHA 推送、实际拉取、Java 21、source/revision、摘要与 main 标签均已核对。
+本地补充测试失败及私有仓库分支保护限制仍如实保留，见下文。
 
 | 验收项 | 结果 |
 | --- | --- |
 | 从最新 main 创建 `feature/day15-ghcr` | PASS：起点 `2ca3664a6d6d03a7a6210f89b28fe59e62dd94eb` |
 | Day 14 CI 已存在 | PASS：`build-test`、`docker-smoke` 及 15/15 报告门禁 |
 | 四 Dockerfile 构建 | PASS：原始版本及全部安全补丁后均已本地构建成功，远程四镜像构建成功 |
-| Maven 与 Gateway 3 项测试 | PASS：原始版本与 Jackson/Tomcat/lz4 补丁后均四模块成功、3 tests / 0 failures / 0 errors |
+| Maven、Java 与预热回归测试 | PASS：四模块打包；Java 3/3、Python 4/4，0 failures / 0 errors |
 | Workflow actionlint | PASS：actionlint 1.7.12；`git diff --check` 通过 |
 | OCI 原镜像导出摘要一致 | PASS：Gateway 导出前后均为 `sha256:cc48c83c95cdbc67142697647b0e5b9030149492ce4e5adc087b6af5c75c1769` |
 | 四镜像 HIGH/CRITICAL 扫描与 JSON | PASS：安全补丁后远程四扫描均成功，下载核对四 JSON 均为 HIGH 0 / CRITICAL 0 |
-| 本地 Docker Smoke | 两次均未完整通过：原始镜像 6 项后 TTL 失败；补丁镜像 8 项后 Kafka 恢复 Saga 等待超时；远程完整回归已通过 |
-| PR 测试通过且不发布 | PASS：最终 head `b442da9` 的 Push / PR 全部成功，15/15 Smoke、四扫描均通过，两个发布 Job skipped |
-| main 四个 GHCR Packages | 已创建四个 Package 与 SHA 标签；首次发布 Job 的可选元数据校验误报，修复中 |
+| 本地 Docker Smoke | 预热修复前两次未完整通过：6 项后 TTL 失败、8 项后 Kafka 恢复 Saga 超时；未将其计为 PASS，最终远程 15/15 PASS |
+| PR 测试通过且不发布 | PASS：PR #3/#4/#5 各自最终 head 的 Push / PR 均成功，两个发布 Job skipped |
+| main 四个 GHCR Packages | PASS：四个私有 Package 均发布完整 SHA 标签，main 标签提升成功 |
 | 私有 Package 关联/访问权限 | PASS：四个 Package 的 visibility 均 private；workflow token 已实际 push/pull；API 不提供 repository 元数据，UI 继承状态不作已验证声明 |
-| SHA 拉取与 main 标签核对 | 四个 SHA 镜像已实际拉取并运行 Java 21，摘要一致；main 标签提升因校验误报而跳过，修复中 |
-| Day 15 PR 合并与 main 远程验收 | PR #3 已合并为 `a1051020acedf5ddaf5f7eeca416ad183d4d3a09`；main 发布验收中 |
+| SHA 拉取与 main 标签核对 | PASS：四镜像实际拉取、Java 21、source/revision 与扫描/发布摘要一致；四个 main/SHA manifest digest 相同 |
+| Day 15 PR 合并与 main 远程验收 | PASS：PR #3/#4/#5 已合并；main 运行 39313175449 全部成功 |
 
 策略为所有 HIGH/CRITICAL（含尚无补丁的漏洞）阻断发布；scanner 错误也失败。
 没有豁免或 `continue-on-error`。发现漏洞时保留真实失败及报告，不以降低门禁完成验收。
@@ -160,3 +164,53 @@ Smoke 配置最小调用数 4、失败率阈值 50%，单次成功探测并不�
 使熔断开启/恢复在写入前完成；业务 POST 仍只发送一次，既有 3 秒/7 秒超时与熔断配置不变。
 新增四项标准库 unittest：健康路由、首次成功后熔断、Order 独立恢复、持续发现失败仍阻断。
 本地四项全部通过，加入 `build-test`；业务 Smoke 验收仍要求原有 15/15，不降低门禁。
+
+预热修复 [PR #5](https://github.com/Maknight233/OrderFlow/pull/5) 的最终 head 为
+`392488c4224cdc0dca73dcfb7181f8b8e62ddc48`。
+[Push 39311568652](https://github.com/Maknight233/OrderFlow/actions/runs/39311568652)
+与 [PR 39311578241](https://github.com/Maknight233/OrderFlow/actions/runs/39311578241)
+均完整成功，两个发布 Job skipped；下载 PR 报告确认 Java 3/3、Python 4/4、
+四扫描 HIGH/CRITICAL 均 0、`orderflow-smoke-bc9f2590c5` 为 15/15 PASS。
+HTTP 记录显示写入前完成 8 次预期 404 的只读探测，随后 POST 均成功。
+
+再次以 expected head SHA 校验合并 PR #5，main 提交为
+`34ed73031211b98b31b487e9182b0d26b9975a73`，
+触发 [最终 main 运行 39313175449](https://github.com/Maknight233/OrderFlow/actions/runs/39313175449)。
+此运行已完成，所有 Job 均为 `completed / success`，包括四个发布 Job 和 `promote-main`。
+
+## 最终 main 发布证据
+
+验收提交：`34ed73031211b98b31b487e9182b0d26b9975a73`。
+四个镜像共同使用标签 `sha-34ed73031211b98b31b487e9182b0d26b9975a73`，平台 `linux/amd64`。
+发布仅使用临时 `GITHUB_TOKEN`，没有添加 PAT 或仓库 Secret。
+
+已下载 [Maven 与预热日志](https://github.com/Maknight233/OrderFlow/actions/runs/39313175449/artifacts/12217176752)
+和 [Docker 报告](https://github.com/Maknight233/OrderFlow/actions/runs/39313175449/artifacts/12216358469)：
+Java 3/3、Python 4/4；`orderflow-smoke-2d53cc50c2` 为 15/15 PASS、`error: null`。
+
+四份最终 Trivy JSON 已下载核对，均为 HIGH 0 / CRITICAL 0：
+[Discovery](https://github.com/Maknight233/OrderFlow/actions/runs/39313175449/artifacts/12217092098)、
+[Gateway](https://github.com/Maknight233/OrderFlow/actions/runs/39313175449/artifacts/12217231653)、
+[Order](https://github.com/Maknight233/OrderFlow/actions/runs/39313175449/artifacts/12217321386)、
+[Inventory](https://github.com/Maknight233/OrderFlow/actions/runs/39313175449/artifacts/12216538995)。
+
+镜像名前缀均为 `ghcr.io/maknight233/orderflow-`。四个发布 Job 的原始日志均确认：
+扫描 manifest digest = 发布 digest = 实际拉取 digest；Java 21 可运行，source/revision 正确，
+Package API visibility 为 private，workflow token 实际 push/pull 成功。
+
+| 服务 | 发布 manifest digest | 远程证据 |
+| --- | --- | --- |
+| `discovery-service` | `sha256:3d3c9730ddba83d18fc0458673e880cbfbe4bb59b418311875b27476782737d9` | [发布与拉取验证](https://github.com/Maknight233/OrderFlow/actions/runs/39313175449/job/118272361818) |
+| `gateway-service` | `sha256:7e02e1db407cc2ee6cc5cc3de16024877eb7c76beee54979b2f1113db25df4ea` | [发布与拉取验证](https://github.com/Maknight233/OrderFlow/actions/runs/39313175449/job/118272361854) |
+| `order-service` | `sha256:e639d6311c202b027986260fc60dc6433694a2977de4832d6ab5d2dec46a7b9b` | [发布与拉取验证](https://github.com/Maknight233/OrderFlow/actions/runs/39313175449/job/118272361980) |
+| `inventory-service` | `sha256:3615f6a8f3b2a5bd5199c61ab81524cc5104043b8b0d12ac12b39cef8485f087` | [发布与拉取验证](https://github.com/Maknight233/OrderFlow/actions/runs/39313175449/job/118272361923) |
+
+[main 标签提升 Job](https://github.com/Maknight233/OrderFlow/actions/runs/39313175449/job/118272803127)
+在 2026-10-19 19:53:03–19:53:16 UTC 实际推送四个 `main` 标签，
+逐个比较 main/SHA manifest digest 相等，全部成功。
+这证明 main 标签引用上述已扫描、已拉取验证的四个镜像，没有重新构建。
+
+初次扫描错误、Package 可选元数据误报、启动熔断失败均保留原始运行；
+它们对应的发布或 main 提升被跳过，未以失败运行更新 main 标签。
+预热修复后的完整本地 Docker 套件没有再重跑；本地两次失败不算作通过，
+远程 Linux CI 的完整 15/15 及发布结果为本次 CI/CD 验收依据。

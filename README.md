@@ -856,8 +856,8 @@ content. Version-tag metadata is prepared for future `v1.0.0` releases; Git
 tag pushes do not currently publish. Images target `linux/amd64`.
 
 ```powershell
-# After authenticating to the private GHCR package, use a published main SHA:
-$commitSha = '<full-published-commit-sha>'
+# After authenticating to GHCR, pull the release verified on 2026-10-19:
+$commitSha = '34ed73031211b98b31b487e9182b0d26b9975a73'
 docker pull "ghcr.io/maknight233/orderflow-gateway-service:sha-$commitSha"
 docker run --rm --entrypoint java "ghcr.io/maknight233/orderflow-gateway-service:sha-$commitSha" -version
 
@@ -880,6 +880,12 @@ and failure as `trivy-<service>-*` artifacts and remain available for 14 days.
 See the [GHCR runbook](docs/day15-ghcr.md) for permissions, tag rules and release
 recovery, and the [acceptance record](docs/day15-ghcr-summary.md) for executed
 checks and any remaining blockers.
+
+Verified [main release 39313175449](https://github.com/Maknight233/OrderFlow/actions/runs/39313175449):
+Java tests 3/3, warmup regressions 4/4 and Docker Smoke 15/15 passed; all four
+images had HIGH 0 / CRITICAL 0. Four private SHA images were pushed and pulled,
+and all four `main` tags match their SHA image digests. The acceptance record
+also retains the local Smoke failures and the GitHub-plan branch-protection limit.
 
 ---
 
