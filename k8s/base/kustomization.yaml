@@ -1,0 +1,42 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: orderflow
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: orderflow
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - postgres.yaml
+  - redis.yaml
+  - kafka.yaml
+  - discovery.yaml
+  - gateway.yaml
+  - order.yaml
+  - inventory.yaml
+patches:
+  - path: java-runtime.patch.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      labelSelector: app.kubernetes.io/component=application
+# Use only the Day 15 release whose four private images were scanned and pulled.
+images:
+  - name: orderflow-discovery-service
+    newName: ghcr.io/maknight233/orderflow-discovery-service
+    newTag: sha-34ed73031211b98b31b487e9182b0d26b9975a73
+    digest: sha256:3d3c9730ddba83d18fc0458673e880cbfbe4bb59b418311875b27476782737d9
+  - name: orderflow-gateway-service
+    newName: ghcr.io/maknight233/orderflow-gateway-service
+    newTag: sha-34ed73031211b98b31b487e9182b0d26b9975a73
+    digest: sha256:7e02e1db407cc2ee6cc5cc3de16024877eb7c76beee54979b2f1113db25df4ea
+  - name: orderflow-order-service
+    newName: ghcr.io/maknight233/orderflow-order-service
+    newTag: sha-34ed73031211b98b31b487e9182b0d26b9975a73
+    digest: sha256:e639d6311c202b027986260fc60dc6433694a2977de4832d6ab5d2dec46a7b9b
+  - name: orderflow-inventory-service
+    newName: ghcr.io/maknight233/orderflow-inventory-service
+    newTag: sha-34ed73031211b98b31b487e9182b0d26b9975a73
+    digest: sha256:3615f6a8f3b2a5bd5199c61ab81524cc5104043b8b0d12ac12b39cef8485f087

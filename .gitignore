@@ -46,3 +46,6 @@ Thumbs.db
 .env.*
 !.env.example
 __pycache__/
+
+# Local Kubernetes credentials and environment overlays
+/k8s/local/

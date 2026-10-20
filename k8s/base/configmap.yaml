@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orderflow-config
+  namespace: orderflow
+data:
+  SPRING_PROFILES_ACTIVE: docker
+  EUREKA_URL: http://discovery-service.orderflow.svc.cluster.local:8761/eureka/
+  # A rolling update briefly has two Pods; register each Pod's reachable IP.
+  EUREKA_INSTANCE_PREFERIPADDRESS: "true"
+  DB_USERNAME: orderflow
+  ORDER_DB_URL: jdbc:postgresql://postgres.orderflow.svc.cluster.local:5432/orderflow
+  INVENTORY_DB_URL: jdbc:postgresql://postgres.orderflow.svc.cluster.local:5432/inventory_db
+  KAFKA_BOOTSTRAP_SERVERS: kafka.orderflow.svc.cluster.local:29092
+  REDIS_HOST: redis.orderflow.svc.cluster.local
+  REDIS_PORT: "6379"
+  TRACING_ENABLED: "false"
+  SERVER_SHUTDOWN: graceful
+  SPRING_LIFECYCLE_TIMEOUTPERSHUTDOWNPHASE: 30s
+  SPRING_FLYWAY_ENABLED: "true"
+  JAVA_TOOL_OPTIONS: -XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=65 -Djava.io.tmpdir=/tmp
+  GATEWAY_CONNECT_TIMEOUT_MS: "1000"
+  GATEWAY_RESPONSE_TIMEOUT: 3s
+  GATEWAY_TOTAL_TIMEOUT: 7s
+  GATEWAY_GET_MAX_ATTEMPTS: "2"
+  GATEWAY_CB_MIN_CALLS: "10"
+  GATEWAY_CB_OPEN_WAIT: 10s
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: orderflow
+data:
+  POSTGRES_USER: orderflow
+  POSTGRES_DB: orderflow
+  # A subdirectory avoids initdb rejecting a volume's lost+found directory.
+  PGDATA: /var/lib/postgresql/data/pgdata
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: orderflow
+data:
+  # The official entrypoint creates POSTGRES_DB first. Only runs on an empty PVC.
+  01-create-inventory-db.sql: |
+    CREATE DATABASE inventory_db;
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-config
+  namespace: orderflow
+data:
+  # Public cluster identity, not a credential; keep it unchanged with its PVC.
+  CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+  KAFKA_NODE_ID: "1"
+  KAFKA_PROCESS_ROLES: broker,controller
+  KAFKA_LISTENERS: INTERNAL://:29092,CONTROLLER://:29093
+  KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-0.kafka-headless.orderflow.svc.cluster.local:29092
+  KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+  KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+  KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+  # Static KRaft quorum, matching the Compose configuration; one broker only.
+  KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-0.kafka-headless.orderflow.svc.cluster.local:29093
+  KAFKA_LOG_DIRS: /var/lib/kafka/data/logs
+  KAFKA_NUM_PARTITIONS: "3"
+  KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+  KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+  KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+  KAFKA_MIN_INSYNC_REPLICAS: "1"
+  KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+  KAFKA_HEAP_OPTS: -Xms256m -Xmx512m

@@ -889,6 +889,22 @@ also retains the local Smoke failures and the GitHub-plan branch-protection limi
 
 ---
 
+## Kubernetes Base (Day 16)
+
+The [Kubernetes base](k8s/base/kustomization.yaml) runs four single-replica Java
+Deployments with PostgreSQL 16, Redis 7 and Kafka 4.2.1 StatefulSets in the
+`orderflow` namespace. Application images use the verified Day 15 SHA and
+manifest digests. Shared probes, resource bounds, non-root security settings
+and graceful shutdown are applied through Kustomize.
+
+Create the external database and GHCR pull Secrets before deployment; real
+credentials are excluded from Git. See the [Day 16 runbook](docs/day16-k8s.md)
+for interactive setup, storage requirements and deployment commands.
+Static validation passed for all 20 rendered resources against Kubernetes
+1.35.0 schemas; live cluster and business-flow acceptance are scheduled for Day 17.
+
+---
+
 ## Planned Improvements
 
 Future development will continue toward:
@@ -898,7 +914,7 @@ Order workflow state management
 Cache consistency and load testing
 Distributed rate limiting
 Integration testing
-Kubernetes deployment
+Kubernetes runtime acceptance
 AWS deployment
 Continuous deployment
 ```
